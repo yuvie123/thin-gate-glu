@@ -20,6 +20,10 @@ Read `README.md` (commands, go/no-go criteria, honesty rules) and `PLAN.md` (ide
   plan. Nothing GPU-related is needed for the abstract. If it goes ahead: `wsl --install -d Ubuntu-24.04` in an elevated PowerShell,
   reboot, create the Linux user. Until `setup_pc.sh` has run inside Ubuntu, Exp. A on GPU, Exp. B,
   Exp. C and `bench.py` are all blocked. Windows sleep on AC is now set to never.
+- **Novelty narrowed 2026-09-17:** WeLore (arXiv 2407.11239, ICML 2025) already reports that `gate_proj` is
+  more low-rank than `up_proj`/`down_proj` in pretrained LLMs. Exp. A is therefore a controlled test of a
+  known observation; the novel part is Exp. B (thin gate from scratch, with controls), which needs a GPU.
+  The intro must start from WeLore. Details in `related.md` (top entry) and `notes.md`.
 - **First evidence (probe only, not for the paper):** on SmolLM2-135M, 8 windows, the gate tolerated
   truncation best in 5 of 6 settings and beat the up-projection in all 6; gate vs down crosses over at
   the lowest rank under whitening. Table in `notes.md`. Encouraging, one model, proves nothing yet.

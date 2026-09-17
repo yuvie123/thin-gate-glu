@@ -4,6 +4,27 @@ One line per paper once you've read it: *what they do / how we differ*. This fil
 The links came from web searches on 2026-09-17. **Verify titles, authors and venues on the page itself,
 and read each paper before citing it.**
 
+## READ THIS ONE FIRST: prior work already reports the asymmetry (found 2026-09-17, evening)
+
+- [ ] **arXiv 2407.11239** `[id verified; key passages checked in the HTML full text, v2]` -- WeLore, "From Low
+  Rank Gradient Subspace Stabilization to Low-Rank Weights: Observations, Theories, and Applications",
+  Jaiswal, Wang, Yin, Liu, Chen, Zhao, Grama, Tian, Wang. **ICML 2025.**
+  **It already says the gate is the low-rank one.** Figure 1 caption (LLaMA2-7B), verbatim: "mlp.up_proj,
+  mlp.down_proj, and self_attn.v_proj exhibit less pronounced Hessian gaps compared to self_attn.k_proj,
+  self_attn.q_proj, self_attn.o_proj, and mlp.gate_proj ... components with a pronounced Hessian gap ...
+  tend to be more low-rank". Its Sec. 2.4 has a paragraph titled "MLP Gate Projections" and explains the
+  effect by the activation concentrating gradients in a few directions. Its method then treats `gate_proj`
+  (with q, k, o) as low-rank components and `up_proj`, `down_proj`, `v_proj` as not. It even has our
+  attention analogy: q/k low-rank, v dense. Models: LLaMA-130M, LLaMA-2 7B and 13B, Mistral-7B.
+  **What it does NOT do** (checked, "not found" in the full text): compress one projection type at a time
+  at equal rank and compare perplexity; train anything from scratch with a low-rank gate; use controls.
+  Everything is post-hoc compression and fine-tuning of pretrained checkpoints.
+  **Consequence for us:** "the gate is more compressible than up and down in pretrained models" is NOT our
+  discovery. Exp. A becomes a controlled test of a published observation (one projection at a time, equal
+  rank, whitened SVD, several small models). The part nobody seems to have done is Exp. B: building the
+  gate thin from the start, against thin-up and thin-down controls. The introduction must open from
+  WeLore, not around it. *Read Sec. 2.1, 2.4, 3.1 and Figures 1, 3 and 7 before writing a word of the intro.*
+
 ## Must read first (decides novelty)
 
 `[id verified]` means the arXiv id, title, authors and venue were checked against the arXiv page on
@@ -13,14 +34,16 @@ per-matrix ablation question below can only be answered from the methods and app
 - [ ] **arXiv 2406.16450** `[id verified]` -- "Building on Efficient Foundations: Effectively Training
   LLMs with Structured Feedforward Layers", Wei, Moalla, Pascanu, Gulcehre. **NeurIPS 2024** (cite the
   proceedings version, not the preprint). Three structured low-rank / block-diagonal parameterizations of
-  the FFN, trained from scratch up to 1.3B, plus a self-guided training scheme. Abstract shows the
-  structure applied to the FFN as a whole with no gate/up/down split. *Still to check in the paper: is
-  there any per-matrix ablation isolating one of gate, up or down?*
+  the FFN, trained from scratch up to 1.3B, plus a self-guided training scheme. **Checked in the HTML full text: their
+  FFN is the 2-matrix GELU kind (Sec. 4.1: "two linear layers and a GeLU activation"), so there is no
+  gate in their models at all**, and no per-matrix ablation or sensitivity comparison was found. They are the
+  uniform-low-rank baseline for NON-gated FFNs; say exactly that. *Read Sec. 2.1, 2.3 and Appendix B.*
 - [ ] **arXiv 2407.09835** `[id verified]` -- "Investigating Low-Rank Training in Transformer Language
   Models: Efficiency and Scaling Analysis", Wei, Moalla, Pascanu, Gulcehre. **ICML 2024 workshop** (Next
   Generation of Sequence Modeling Architectures), so a workshop paper, not main-conference. Low-rank FFN
   training to 1.3B on RefinedWeb; reports 2.6x FFN speedup at 32% of the parameters. Same authors as
-  2406.16450, so read these two together. *Same per-matrix check.*
+  2406.16450, so read these two together. **Checked: also a 2-matrix GELU FFN (Sec. 3.1), no gate, no
+  per-matrix ablation; they keep the first FFN dense.**
 - [ ] **arXiv 2603.04427** `[id verified]` -- "Thin Keys, Full Values: Reducing KV Cache via
   Low-Dimensional Attention Selection", Yao, Chen, Murtadha, Wang (Feb 2026, rev. Mar 2026; no venue
   listed). SVD-factorizes the KEY projection to shrink the KV cache while values stay full-dimensional,
@@ -32,8 +55,11 @@ per-matrix ablation question below can only be answered from the methods and app
   Decomposition for Low-Rank LLM Pre-training", Kim, Kwak (14 Sep 2026). **EMNLP 2026 Main Conference.**
   Allocates low-rank *gradient* projection ranks per module by sensitivity instead of uniformly, with
   block-wise magnitude-direction decomposition. Abstract reports module-level sensitivity but no
-  within-GLU comparison of gate vs up vs down, and it does not factorize only the gate. *Still to check:
-  does any table or appendix break sensitivity down to the gate/up/down level?*
+  within-GLU comparison of gate vs up vs down, and it does not factorize only the gate. **Checked in the HTML full text:
+  this is about low-rank GRADIENT projection (optimizer state), not low-rank weights. Appendix C.3 / Table 6
+  gives an ordering only: `mlp.down` least sensitive by a wide margin, `mlp.up` and `mlp.gate` in the
+  middle, no numbers separating gate from up. It calls attn q/k the "routing pair" and v/o "content",
+  language close to ours.** Not gate-only, not weights; cite as related evidence on per-module sensitivity.
 
 **Novelty status after id verification (not after reading):** none of these four factorizes only the gate.
 The closest, 2603.04427, makes the same selection-vs-content argument but in attention. This does not
@@ -109,7 +135,7 @@ treat it as a pointer to where to read, not as a finding you can cite.
   Weights: Observations, Theories, and Applications" (WeLore), Jaiswal, Wang, Yin, Liu, Chen, Zhao, Grama,
   Tian, Wang. **ICML 2025.** Abstract: "different LLM components exhibit varying levels of converged
   low-rank structures, necessitating variable rank reduction across them". It does not name the gate.
-  *Check its per-matrix figures: do gate_proj, up_proj and down_proj come out differently?*
+  **Checked: yes, and decisively. See the entry at the very top of this file.**
 - [ ] **arXiv 2606.31717** `[id verified]` -- "Nonlinearity-Aware LoRA: Structured Gate Adaptation under
   Low-Rank Constraints", Yuan, Cai, Chen, Zheng, Xiao, Onizuka, Mao (30 Jun 2026; page says under review).
   Fine-tuning ADAPTERS on the gate of gated FFNs, not a low-rank replacement of the gate itself. Relevant

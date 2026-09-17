@@ -265,3 +265,32 @@ The abstract stays numbers-free and neutral about the direction.
 - These are an early look, not paper numbers. The 135M model gets rerun on the GPU in bf16 with the other
   models if the GPU route goes ahead; if it never does, moving these into `results/posthoc/` is a decision
   to take and log then, with the CPU/fp32 provenance stated in the paper.
+
+### 2026-09-17, about 16:45: prior work already reports the gate asymmetry (WeLore, ICML 2025)
+
+Looked inside the full texts of the must-read papers instead of only their abstracts. Result, stated plainly:
+
+- **WeLore (arXiv 2407.11239, ICML 2025) already reports that `gate_proj` is more low-rank than `up_proj` and
+  `down_proj`** in pretrained LLMs (Figure 1 caption, LLaMA2-7B; Sec. 2.4 "MLP Gate Projections"), explains
+  it through the activation function, builds its method on it (gate, q, k, o treated as low-rank; up, down,
+  v not), and draws the same attention analogy we do. Passages are quoted in `related.md`.
+- So the central observation of Exp. A is **not new**. Our probe this afternoon agrees with it in direction,
+  which makes Exp. A more likely to come out positive and less novel at the same time.
+- What WeLore does not contain (searched for, not found): one projection type truncated at a time at equal
+  rank with perplexity compared; any from-scratch training with a low-rank gate; symmetric controls.
+- 2406.16450 and 2407.09835 turn out to use 2-matrix GELU FFNs, so they have no gate at all. MoARa is about
+  gradient projection and gives only an ordering with `mlp.down` least sensitive.
+
+**What this changes.**
+1. The novelty of the paper now rests mainly on **Exp. B** (thin gate built from scratch, with thin-up and
+   thin-down controls at matched parameters) and secondarily on Exp. C. Exp. A alone would be a controlled
+   replication of a known observation on small models: fine for a workshop, thin for the main track.
+   Exp. B needs a GPU, so the open GPU decision now matters more than it did this morning.
+2. The introduction has to start from WeLore: prior work observed the asymmetry post hoc in pretrained
+   models; we test it one projection at a time under equal-rank control, and ask whether it can be used as
+   a design rule.
+3. The registration abstract needs no change: it claims no novelty for the observation and every sentence in
+   it is still true. It should credit the prior observation in the Sep 25 version, after the author has read
+   WeLore (rule: nothing about a paper the author has not read).
+4. This was found by a targeted look at HTML full texts through an automated reader. The author still has to
+   read WeLore Sec. 2.1, 2.4, 3.1 and Figures 1, 3, 7 personally before any of this goes into the paper.

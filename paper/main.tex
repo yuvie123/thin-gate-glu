@@ -60,7 +60,10 @@ our experiments.
 %     Related evidence: sparsity predictors are low-rank (CITE Deja Vu line); attention selection is
 %     low-dimensional (CITE: arXiv 2603.04427).
 %  3. Gap: low-rank FFN training factorizes all matrices uniformly (CITE: arXiv 2406.16450, 2407.09835);
-%     nobody isolates the gate. \todo{confirm with a literature search; soften if you find prior work}
+%     nobody isolates the gate. \todo{REWRITE: prior work found. WeLore (arXiv 2407.11239, ICML 2025)
+%     already reports the gate projection as more low-rank than up/down in pretrained LLMs, post hoc. The
+%     2406.16450 line uses 2-matrix GELU FFNs with no gate. Our gap: one projection at a time at equal rank,
+%     and a thin gate trained from scratch with thin-up / thin-down controls. Read WeLore first.}
 %  4. What we do (A, B, C) and what we find. State scale limits HERE, not only in Limitations.
 %  5. Contributions as 3 bullets, each one a claim a table/figure directly supports.
 \todo{introduction}
