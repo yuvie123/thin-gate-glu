@@ -294,3 +294,29 @@ Looked inside the full texts of the must-read papers instead of only their abstr
    WeLore (rule: nothing about a paper the author has not read).
 4. This was found by a targeted look at HTML full texts through an automated reader. The author still has to
    read WeLore Sec. 2.1, 2.4, 3.1 and Figures 1, 3, 7 personally before any of this goes into the paper.
+
+### 2026-09-17, about 17:00: cloud GPU route built (author does not want to load the local GPU)
+
+- New: `cloud_run.py` (runner) and `make_cloud_notebook.py` (builds `cloud_notebook.ipynb`, git-ignored because
+  generated). The notebook writes the code to the cloud machine itself, so the private repo is never shared.
+  The runner gives each GPU the next unit of work (one model = whitened then plain), keeps going if a model
+  fails, skips finished runs, and refreshes `thin_gate_results.zip` after every job. Gated Llama-3.2-1B is
+  skipped unless an HF token is provided.
+- **Code change, `posthoc_truncate.py`:** new `--dtype auto|float32|bfloat16`. `auto` now means bfloat16 only on
+  GPUs with native support (compute capability 8 or higher) and float32 elsewhere. Before, any CUDA device got
+  bfloat16, which a T4 only emulates. CPU and RTX 3070 behaviour is unchanged. The cloud run passes
+  `--dtype float32` for EVERY model so that Exp. A has one precision throughout.
+- **Code change, `train.py`:** new `--amp_dtype auto|bfloat16|float16`, with a `GradScaler` that is enabled only
+  for float16. Verified that the default path is unchanged: the smoke run's full validation curve is identical,
+  to the last digit, between the old and the new file. The float16 path was exercised on the CPU only; its
+  first real test is the GPU smoke run in the notebook's check step, which takes under a minute.
+- `python tests.py`: 6/6 after both changes. `posthoc_truncate.py --smoke` passes with `auto` and with
+  `--dtype bfloat16`. Runner mechanics tested with fake jobs on two pretend GPUs: parallel dispatch, GPU
+  pinning, a failing job, skip-if-done and the zip all behave.
+- Not tested, because there is no CUDA here: anything on a real T4. Time estimate for Exp. A on two T4s is
+  7 to 8 hours and is a guess from FLOP counts, not a measurement.
+- Consequences to remember: (1) cloud Exp. A results are float32 on a T4, and a later 3070 run of the same
+  model in bfloat16 would overwrite the file of the same name and must not be mixed into the same figure;
+  (2) if the Exp. B pilot runs in the cloud in float16, then ALL of Exp. B has to run there.
+- The CPU sweep that started at 16:21 keeps running. Its second half starts a new Python process that loads
+  the edited `posthoc_truncate.py`; on a CPU `auto` still resolves to float32, so the run is unaffected.

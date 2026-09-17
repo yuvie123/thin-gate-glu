@@ -15,7 +15,8 @@ Read `README.md` (commands, go/no-go criteria, honesty rules) and `PLAN.md` (ide
 ## Status (update this section as work proceeds)
 - 2026-09-17 (Day 0): all experiment code written; `tests.py` passes (6 tests).
 - GPU PC: `nvidia-smi` healthy from Windows (RTX 3070, 8 GB, driver 560.94). **WSL2 is still not
-  installed and the GPU route is on hold**: the author is reluctant to load the GPU for the ~100 h the
+  installed and the local GPU route is on hold** (a cloud route now exists: `make_cloud_notebook.py` builds a
+  self-contained Kaggle/Colab notebook, see README): the author is reluctant to load the GPU for the ~100 h the
   full grid needs. Open options: CPU-only Exp. A, a free cloud GPU, a cut-down grid at night, or the full
   plan. Nothing GPU-related is needed for the abstract. If it goes ahead: `wsl --install -d Ubuntu-24.04` in an elevated PowerShell,
   reboot, create the Linux user. Until `setup_pc.sh` has run inside Ubuntu, Exp. A on GPU, Exp. B,

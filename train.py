@@ -54,6 +54,9 @@ def get_args():
     ap.add_argument("--data_dir", default="data/fineweb10B")
     ap.add_argument("--out_dir", default="results/train")
     ap.add_argument("--no_compile", action="store_true")
+    ap.add_argument("--amp_dtype", default="auto", choices=["auto", "bfloat16", "float16"],
+                    help="autocast precision. auto = bfloat16 on the CPU and on GPUs that support it natively "
+                         "(Ampere or newer); float16 with loss scaling on older GPUs such as the T4")
     ap.add_argument("--smoke", action="store_true", help="tiny model + random tokens; checks the code runs")
     return ap.parse_args()
 
@@ -116,7 +119,15 @@ def main():
         lr=args.lr, betas=(0.9, 0.95), fused=(device == "cuda"),
     )
 
-    autocast = torch.autocast(device_type=device, dtype=torch.bfloat16)
+    if args.amp_dtype == "auto":
+        old_gpu = device == "cuda" and torch.cuda.get_device_capability()[0] < 8
+        amp_dtype = torch.float16 if old_gpu else torch.bfloat16
+    else:
+        amp_dtype = getattr(torch, args.amp_dtype)
+    autocast = torch.autocast(device_type=device, dtype=amp_dtype)
+    # float16 has a narrow exponent range, so its gradients need loss scaling. With bfloat16 the scaler is
+    # disabled and every call below passes straight through, so that path is unchanged.
+    scaler = torch.amp.GradScaler(device, enabled=(amp_dtype == torch.float16))
     step_model = model
     if device == "cuda" and not args.no_compile:
         step_model = torch.compile(model)
@@ -140,10 +151,12 @@ def main():
             x, y = data.train_batch(args.micro_bs)
             with autocast:
                 _, loss = step_model(x.to(device, non_blocking=True), y.to(device, non_blocking=True))
-            (loss / accum).backward()
+            scaler.scale(loss / accum).backward()
             loss_sum += loss.item() / accum
+        scaler.unscale_(opt)
         torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
-        opt.step()
+        scaler.step(opt)
+        scaler.update()
         opt.zero_grad(set_to_none=True)
 
         if not math.isfinite(loss_sum):
@@ -182,6 +195,7 @@ def main():
         "peak_memory_gb": torch.cuda.max_memory_allocated() / 1e9 if device == "cuda" else None,
         "device": torch.cuda.get_device_name(0) if device == "cuda" else "cpu",
         "torch_version": torch.__version__,
+        "amp_dtype": str(amp_dtype).replace("torch.", ""),
         "log": log,
     }
     os.makedirs(args.out_dir, exist_ok=True)

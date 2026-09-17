@@ -14,3 +14,6 @@ paper/*.out
 Screenshot*.png
 results/scratch/
 results/logs/
+cloud_notebook.ipynb
+thin_gate_results.zip
+logs/

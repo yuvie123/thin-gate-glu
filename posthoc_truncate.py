@@ -43,6 +43,8 @@ def get_args():
     ap.add_argument("--whiten", action="store_true")
     ap.add_argument("--calib_blocks", type=int, default=32)
     ap.add_argument("--layers_per_pass", type=int, default=4, help="whitening: layers calibrated at once (memory)")
+    ap.add_argument("--dtype", default="auto", choices=["auto", "float32", "bfloat16"],
+                    help="auto = bfloat16 on GPUs that support it natively (Ampere or newer), float32 elsewhere")
     ap.add_argument("--out_dir", default="results/posthoc")
     ap.add_argument("--smoke", action="store_true")
     return ap.parse_args()
@@ -138,8 +140,13 @@ def run(model, eval_blocks, calib_blocks, args):
 def main():
     args = get_args()
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    # bf16 is native on the GPU, but Zen-2 CPUs emulate it and become unusably slow, so use fp32 there.
-    dtype = torch.bfloat16 if device == "cuda" else torch.float32
+    # bf16 is native on Ampere-or-newer GPUs. Zen-2 CPUs and older GPUs such as the T4 only emulate it and
+    # become unusably slow, so they get fp32. The dtype is recorded in the results JSON either way.
+    if args.dtype == "auto":
+        native_bf16 = device == "cuda" and torch.cuda.get_device_capability()[0] >= 8
+        dtype = torch.bfloat16 if native_bf16 else torch.float32
+    else:
+        dtype = getattr(torch, args.dtype)
 
     if args.smoke:
         from transformers import LlamaConfig, LlamaForCausalLM

@@ -22,6 +22,7 @@ The MacBook is for editing code, writing the paper, plotting, and `--smoke` chec
 | `bench.py` | measured tokens/s and memory for each arm |
 | `plot.py` | turns results/*.json into `paper/figures/*.pdf` and `paper/tables/*.tex` |
 | `tests.py` | correctness tests, to run after every code change |
+| `cloud_run.py`, `make_cloud_notebook.py` | run the experiments on a free cloud GPU from one self-contained notebook |
 | `paper/` | ICLR 2027 template (`main.tex`) with the official style files left untouched |
 
 Every script accepts `--help`. Each also accepts `--smoke`, which runs a toy check in under a minute and downloads nothing.
@@ -49,6 +50,12 @@ bash run_posthoc.sh            # plain SVD, all models
 bash run_posthoc.sh --whiten   # activation-aware SVD, all models
 python plot.py
 ```
+
+### Running on a cloud GPU instead
+
+`python make_cloud_notebook.py` writes `cloud_notebook.ipynb`, which carries its own copy of the code, so the private repo is never shared. Upload it to Kaggle (Accelerator: GPU T4 x2, Internet: on, notebook private) and use Save Version, then Save & Run All. When it finishes, download `thin_gate_results.zip` from the Output tab and unzip it into this folder, so the files land in `results/posthoc/`. Rebuild the notebook after any code change, because the copy inside it does not update.
+
+A T4 has no native bfloat16. Exp. A therefore runs in float32 on every model in the cloud, and Exp. B falls back to float16 with loss scaling. Each result file records its precision and GPU. Don't put runs from different precisions or GPUs into one table.
 
 ### Day 3: go or no-go (decide by 6 pm Sunday Sep 20)
 
