@@ -14,8 +14,10 @@ Read `README.md` (commands, go/no-go criteria, honesty rules) and `PLAN.md` (ide
 
 ## Status (update this section as work proceeds)
 - 2026-09-17 (Day 0): all experiment code written; `tests.py` passes (6 tests).
-- GPU PC: `nvidia-smi` healthy from Windows (RTX 3070, 8 GB, driver 560.94). **WSL2 install is in
-  progress** (decided 2026-09-17 ~15:50): `wsl --install -d Ubuntu-24.04` in an elevated PowerShell,
+- GPU PC: `nvidia-smi` healthy from Windows (RTX 3070, 8 GB, driver 560.94). **WSL2 is still not
+  installed and the GPU route is on hold**: the author is reluctant to load the GPU for the ~100 h the
+  full grid needs. Open options: CPU-only Exp. A, a free cloud GPU, a cut-down grid at night, or the full
+  plan. Nothing GPU-related is needed for the abstract. If it goes ahead: `wsl --install -d Ubuntu-24.04` in an elevated PowerShell,
   reboot, create the Linux user. Until `setup_pc.sh` has run inside Ubuntu, Exp. A on GPU, Exp. B,
   Exp. C and `bench.py` are all blocked. Windows sleep on AC is now set to never.
 - **No experiment result exists yet.** A CPU fallback sweep of Exp. A (SmolLM2-135M, fp32) was started
@@ -35,7 +37,10 @@ Read `README.md` (commands, go/no-go criteria, honesty rules) and `PLAN.md` (ide
   author must claim the exemption there or risk desk rejection. License is CC BY 4.0 (the only option).
   Still missing: the Primary Area dropdown options.
 
-### Next, in order (pick up here after the reboot)
+### Next, in order
+0. **File the abstract form by Friday evening** (hard limit Sat Sep 19, 7:59 AM EDT) from
+   `paper/openreview_abstract_form.md`. Then settle the GPU question above. Steps 1-5 apply only if
+   the local GPU route is chosen.
 1. Inside Ubuntu: `nvidia-smi` must show the RTX 3070. Then the `SETUP_PC.md` shortcut: `gh auth login`,
    clone under `~/thin-gate` (never `/mnt/c`), `bash ~/thin-gate/setup_pc.sh`. The CUDA check must print
    `True`; if not, stop and fix that first.

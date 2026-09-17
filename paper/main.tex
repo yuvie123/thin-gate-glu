@@ -38,8 +38,8 @@
 Gated linear units (GLUs) are the standard feed-forward block in modern Transformers and spend three
 equally sized projections per block: a gate, an up-projection, and a down-projection. These play
 different roles: the gate selects which hidden units are active, while the up- and down-projections
-carry the content written back to the residual stream. Existing architectures and low-rank methods
-nevertheless allocate them identical capacity. We ask whether selection is cheaper than content.
+carry the content written back to the residual stream. Standard architectures nevertheless give all
+three the same capacity. We ask whether selection is cheaper than content.
 First, in a training-free study of open pretrained language models, we compare truncating each
 projection to the same rank at matched parameter savings, using both plain and activation-aware
 singular value decompositions. Second, we study the thin-gate GLU, which factorizes only the gate

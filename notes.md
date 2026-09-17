@@ -178,3 +178,22 @@ Not covered, and said so in `related.md`: OpenReview's own search over ICLR 2026
 check blocks automated reading, and one relevant-looking submission, `QSoc7HGc6Q`, could not be verified for
 that reason) and Google Scholar "cited by". A Semantic Scholar citation lookup returned 4 citing papers for
 2406.16450, which is implausibly few, so it is treated as incomplete rather than as evidence of absence.
+
+### 2026-09-17, evening: abstract registration made ready
+
+- `paper/openreview_abstract_form.md` now holds the value for every field of the OpenReview abstract form,
+  in form order, built from the three form screenshots and the ICLR 2027 Author Guidelines page.
+- Abstract changed in one place: "Existing architectures and low-rank methods nevertheless allocate them
+  identical capacity" became "Standard architectures nevertheless give all three the same capacity". The
+  old sentence was false after the searches above (LASER treats the FFN asymmetrically; FLRC, WeLore and
+  MoARa allocate rank per module). The new one is true of every LLaMA-style block. Sheet and `main.tex`
+  abstract verified identical.
+- Checked on the guidelines page: title and abstract stay editable until the paper deadline; authors cannot
+  be added or removed after the abstract deadline; a paper withdrawn BEFORE the paper deadline is deleted
+  from OpenReview, so registering commits to nothing; first-time authors with no qualified reviewer are
+  exempt from reciprocal reviewing, capped at one submission per author; placeholder abstracts are removed.
+- Still open: the Primary Area dropdown was never captured. The call for papers lists the usual areas; the
+  sheet gives a ranked choice. It only affects reviewer matching.
+- The abstract still promises Exp. B, Exp. C and the throughput benchmark, which need a GPU. Whether and
+  how the GPU gets used is undecided (author is reluctant to load it for ~100 h). Nothing GPU-related is
+  needed for Saturday. Sentences for experiments that do not happen must be deleted before Sep 25.
