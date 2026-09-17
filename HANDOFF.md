@@ -14,13 +14,12 @@ Read `README.md` (commands, go/no-go criteria, honesty rules) and `PLAN.md` (ide
 
 ## Status (update this section as work proceeds)
 - 2026-09-17 (Day 0): all experiment code written; `tests.py` passes (6 tests).
-- GPU PC: `nvidia-smi` healthy from Windows (RTX 3070, 8 GB, driver 560.94). **WSL2 is still not
-  installed and the local GPU route is on hold** (a cloud route now exists: `make_cloud_notebook.py` builds a
-  self-contained Kaggle/Colab notebook, see README): the author is reluctant to load the GPU for the ~100 h the
-  full grid needs. Open options: CPU-only Exp. A, a free cloud GPU, a cut-down grid at night, or the full
-  plan. Nothing GPU-related is needed for the abstract. If it goes ahead: `wsl --install -d Ubuntu-24.04` in an elevated PowerShell,
-  reboot, create the Linux user. Until `setup_pc.sh` has run inside Ubuntu, Exp. A on GPU, Exp. B,
-  Exp. C and `bench.py` are all blocked. Windows sleep on AC is now set to never.
+- **GPU route, decided 2026-09-17: everything runs on Kaggle T4s, not on the local RTX 3070** (the author does
+  not want to load it). WSL2 is therefore not needed. `make_cloud_notebook.py --run <steps>` builds a
+  self-contained notebook with the code and all finished results inside; the author uploads it, runs it,
+  downloads `thin_gate_results.zip`, unzips it here. Exp. A is float32, Exp. B/C float16 with loss
+  scaling, all on T4s; never pool with runs from another GPU or precision. Session plan in `README.md`
+  and `notes.md`. Nothing has run on a T4 yet. Windows sleep on AC is set to never.
 - **Novelty narrowed 2026-09-17:** WeLore (arXiv 2407.11239, ICML 2025) already reports that `gate_proj` is
   more low-rank than `up_proj`/`down_proj` in pretrained LLMs. Exp. A is therefore a controlled test of a
   known observation; the novel part is Exp. B (thin gate from scratch, with controls), which needs a GPU.
@@ -46,21 +45,15 @@ Read `README.md` (commands, go/no-go criteria, honesty rules) and `PLAN.md` (ide
   Still missing: the Primary Area dropdown options.
 
 ### Next, in order
-0. **File the abstract form by Friday evening** (hard limit Sat Sep 19, 7:59 AM EDT) from
-   `paper/openreview_abstract_form.md`. Then settle the GPU question above. Steps 1-5 apply only if
-   the local GPU route is chosen.
-1. Inside Ubuntu: `nvidia-smi` must show the RTX 3070. Then the `SETUP_PC.md` shortcut: `gh auth login`,
-   clone under `~/thin-gate` (never `/mnt/c`), `bash ~/thin-gate/setup_pc.sh`. The CUDA check must print
-   `True`; if not, stop and fix that first.
-2. `python tests.py` (6/6), `python train.py --smoke`, `python posthoc_truncate.py --smoke`.
-3. In `tmux`, one GPU job at a time: Exp. A on SmolLM2-135M, plain. **Baseline perplexity must be in the
-   tens** (CPU fp32 gave 17.463; bf16 will be close, not identical). Then `--whiten`, then the same pair
-   for SmolLM2-360M and Qwen2.5-0.5B.
-4. `python data.py --num_train_shards 6`, the 20M-token throughput check, then fix `TOKENS["S"]` in
-   `grid.py` so one S run is at most ~1.5 h, before any grid starts.
-5. `python grid.py --stage pilot --run` overnight in `tmux`, from an Ubuntu terminal window that stays
-   open (WSL can stop an idle distro once its last terminal closes). Check it survives detaching.
-6. Alongside: file the abstract form by Friday evening (hard limit Sat 07:59 EDT); pause Windows Update.
+1. **File the abstract form by Friday evening** (hard limit Sat Sep 19, 7:59 AM EDT) from
+   `paper/openreview_abstract_form.md`.
+2. Kaggle session 1: upload `cloud_notebook.ipynb` (speed check + Exp. A). Check the log for the 135M
+   baseline near 17.46. Unzip the results here, commit, run `python plot.py`.
+3. Fix `TOKENS["S"]` in `grid.py` from the measured tokens/s, BEFORE any grid run; rerun `tests.py`.
+4. Session 2: `--run pilot`. Sunday 6 pm: go/no-go on the Exp. A figure plus the pilot.
+5. Sessions 3-4: `--run main_S`, then `--run heal,bench`. Experiments freeze Wed Sep 23 noon.
+6. The author reads WeLore first, then the other must-reads (`related.md`); BibTeX only after reading.
+7. Update `paper/main.tex` where it still says the experiments ran on one 8 GB consumer GPU.
 
 ## Rules for this project (non-negotiable)
 1. **Never fabricate or guess** results, citations, or benchmark numbers. Every number in the paper comes from a JSON in `results/` via `plot.py`. `paper/references.bib` entries are exported by the author from the paper's own page after reading it, never written from memory.

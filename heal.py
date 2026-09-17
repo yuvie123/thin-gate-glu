@@ -24,6 +24,7 @@ import torch
 from hf_utils import eval_text, mlp_linears, perplexity, tokenize_blocks
 from model import LowRankLinear
 from posthoc_truncate import collect_grams, factorize
+from train import pick_amp_dtype
 
 
 def get_args():
@@ -39,6 +40,8 @@ def get_args():
     ap.add_argument("--lr", type=float, default=2e-4)
     ap.add_argument("--warmup_steps", type=int, default=50)
     ap.add_argument("--grad_ckpt", action="store_true", help="trade speed for memory")
+    ap.add_argument("--amp_dtype", default="auto", choices=["auto", "bfloat16", "float16"],
+                    help="autocast precision; auto = bfloat16 where native, float16 with loss scaling on older GPUs")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out_dir", default="results/heal")
     ap.add_argument("--smoke", action="store_true")
@@ -87,7 +90,9 @@ def main():
         calib_blocks = tokenize_blocks(tok, eval_text("wikitext2", "train"), args.seq_len, 32) if args.whiten else None
         stream = packed_stream(tok, args.seq_len, args.micro_bs, args.seed)
 
-    autocast = torch.autocast(device_type=device, dtype=torch.bfloat16)
+    amp_dtype = pick_amp_dtype(device, args.amp_dtype)
+    autocast = torch.autocast(device_type=device, dtype=amp_dtype)
+    scaler = torch.amp.GradScaler(device, enabled=(amp_dtype == torch.float16))   # a no-op with bfloat16
     model.eval()
     with autocast:
         ppl_base = perplexity(model, eval_blocks)
@@ -143,10 +148,12 @@ def main():
             x = next(stream).to(device)
             with autocast:
                 loss = model(input_ids=x, labels=x).loss
-            (loss / accum).backward()
+            scaler.scale(loss / accum).backward()
             loss_sum += loss.item() / accum
+        scaler.unscale_(opt)
         torch.nn.utils.clip_grad_norm_(factors, 1.0)
-        opt.step()
+        scaler.step(opt)
+        scaler.update()
         opt.zero_grad(set_to_none=True)
         if step % 20 == 0 or step + 1 == total_steps:
             curve.append({"step": step, "loss": loss_sum})
@@ -165,6 +172,8 @@ def main():
         "train_tokens": total_steps * args.batch_seqs * args.seq_len,
         "wall_seconds": time.time() - t0, "curve": curve,
         "peak_memory_gb": torch.cuda.max_memory_allocated() / 1e9 if device == "cuda" else None,
+        "device": torch.cuda.get_device_name(0) if device == "cuda" else "cpu",
+        "amp_dtype": str(amp_dtype).replace("torch.", ""),
     }
     os.makedirs(args.out_dir, exist_ok=True)
     tag = f"{args.model.replace('/', '__')}__{args.type}__r{args.rank_frac:g}__{result['init']}__s{args.seed}"

@@ -18,7 +18,7 @@ import torch
 
 from grid import arms_for
 from model import GPT, GPTConfig, count_params, flops_per_token
-from train import SIZES
+from train import SIZES, pick_amp_dtype
 
 
 def timed(fn, device, warmup, iters):
@@ -41,6 +41,7 @@ def main():
     ap.add_argument("--seq_len", type=int, default=1024)
     ap.add_argument("--iters", type=int, default=20)
     ap.add_argument("--no_compile", action="store_true")
+    ap.add_argument("--amp_dtype", default="auto", choices=["auto", "bfloat16", "float16"])
     ap.add_argument("--out_dir", default="results/bench")
     ap.add_argument("--smoke", action="store_true")
     args = ap.parse_args()
@@ -50,7 +51,8 @@ def main():
     vocab = 50304
     if args.smoke:
         args.micro_bs, args.seq_len, args.iters, args.out_dir, vocab = 2, 32, 2, "results/smoke", 512
-    autocast = torch.autocast(device_type=device, dtype=torch.bfloat16)
+    amp_dtype = pick_amp_dtype(device, args.amp_dtype)
+    autocast = torch.autocast(device_type=device, dtype=amp_dtype)
     rows = []
 
     for name, arm in arms_for(args.size, (2, 4, 8)).items():
@@ -90,7 +92,8 @@ def main():
     path = os.path.join(args.out_dir, f"bench_{args.size}.json")
     with open(path, "w") as f:
         json.dump({"size": args.size, "micro_bs": args.micro_bs, "seq_len": args.seq_len,
-                   "device": torch.cuda.get_device_name(0) if device == "cuda" else "cpu", "rows": rows}, f, indent=1)
+                   "device": torch.cuda.get_device_name(0) if device == "cuda" else "cpu",
+                   "amp_dtype": str(amp_dtype).replace("torch.", ""), "rows": rows}, f, indent=1)
     print("saved", path)
 
 

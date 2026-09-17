@@ -51,11 +51,22 @@ bash run_posthoc.sh --whiten   # activation-aware SVD, all models
 python plot.py
 ```
 
-### Running on a cloud GPU instead
+### Running on a cloud GPU (the route in use: decided 2026-09-17)
 
-`python make_cloud_notebook.py` writes `cloud_notebook.ipynb`, which carries its own copy of the code, so the private repo is never shared. Upload it to Kaggle (Accelerator: GPU T4 x2, Internet: on, notebook private) and use Save Version, then Save & Run All. When it finishes, download `thin_gate_results.zip` from the Output tab and unzip it into this folder, so the files land in `results/posthoc/`. Rebuild the notebook after any code change, because the copy inside it does not update.
+Every GPU experiment runs on Kaggle's free T4s, so the PC's own GPU stays free. `python make_cloud_notebook.py` writes `cloud_notebook.ipynb`, which carries its own copy of the code, so the private repo is never shared. Upload it to Kaggle (Accelerator: GPU T4 x2, Internet: on, notebook private) and use Save Version, then Save & Run All. When it finishes, download `thin_gate_results.zip` from the Output tab and unzip it into this folder.
 
-A T4 has no native bfloat16. Exp. A therefore runs in float32 on every model in the cloud, and Exp. B falls back to float16 with loss scaling. Each result file records its precision and GPU. Don't put runs from different precisions or GPUs into one table.
+Kaggle sessions start empty and stop after 12 hours, so the work is split into sessions, and each new notebook carries the finished results of the earlier ones inside it:
+
+```bash
+python make_cloud_notebook.py                          # session 1: speed check + Exp. A on all models
+python make_cloud_notebook.py --run pilot              # session 2: Exp. B pilot, after TOKENS["S"] is fixed
+python make_cloud_notebook.py --run main_S             # sessions 3-4: all arms, three seeds (finished runs are skipped)
+python make_cloud_notebook.py --run heal,bench         # Exp. C and the speed/memory table
+```
+
+After every session: unzip, `git add results && git commit`, rebuild the notebook, upload, run. Rebuild after any code change too, because the copy inside an old notebook does not update.
+
+A T4 has no native bfloat16. Exp. A therefore runs in float32 on every model, and Exp. B and C use float16 with loss scaling. Each result file records its precision and GPU. All of Exp. B has to come from this one recipe: don't put runs from different precisions or GPUs into one table. The "Commands, in order" below describe the same experiments run directly on a local GPU and are kept for reference.
 
 ### Day 3: go or no-go (decide by 6 pm Sunday Sep 20)
 

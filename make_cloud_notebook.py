@@ -2,19 +2,46 @@
 Builds cloud_notebook.ipynb: one self-contained notebook that carries a copy of the experiment code, so the
 experiments can run on a free cloud GPU (Kaggle, Colab) without giving anyone access to the private repo.
 
-    python make_cloud_notebook.py
+    python make_cloud_notebook.py                          # session 1: speed check + Exp. A
+    python make_cloud_notebook.py --run pilot              # a later session: Exp. B pilot
+    python make_cloud_notebook.py --run main_S,heal,bench  # steps run in the order given
+
+Kaggle sessions start empty and stop after 12 hours. So every finished result file found under results/ on
+this machine is packed INTO the notebook, and the runner skips whatever is already done. The loop is: run,
+download the zip, unzip it into this folder, rebuild the notebook, upload, run again.
 
 Re-run this after ANY change to the code, and upload the fresh notebook: the copy inside an old notebook does
 not update itself. The notebook is git-ignored because it is generated; this script and cloud_run.py are the
 source. Standard library only, so it also runs on the laptop.
 """
 
+import argparse
+import base64
+import io
 import json
+import os
 import subprocess
+import zipfile
 
 FILES = ["hf_utils.py", "posthoc_truncate.py", "model.py", "data.py", "train.py", "grid.py", "heal.py",
          "bench.py", "tests.py", "cloud_run.py"]
 OUT = "cloud_notebook.ipynb"
+CARRY_DIRS = ["results/posthoc", "results/train", "results/heal", "results/bench"]   # never smoke or scratch
+STEPS = {   # name -> (heading, command, note)
+    "throughput": ("Speed check for Experiment B", "python cloud_run.py throughput",
+                   "Trains the smallest model on 20M tokens and says how long one real run would take. This "
+                   "number decides the token budget, which must be fixed BEFORE any grid run starts."),
+    "posthoc": ("Experiment A: which projection tolerates rank reduction?", "python cloud_run.py posthoc",
+                "Every model, whitened SVD then plain SVD, smallest first. Look for SmolLM2-135M baseline "
+                "perplexity close to 17.46, the value measured on the CPU."),
+    "pilot": ("Experiment B: pilot runs", "python cloud_run.py pilot",
+              "Dense (two seeds, which gives the noise floor), shrunk, thin-gate, thin-up, thin-down at size S."),
+    "main_S": ("Experiment B: all arms at size S, three seeds", "python cloud_run.py grid --stage main_S", ""),
+    "main_M": ("Experiment B: key arms at size M, two seeds", "python cloud_run.py grid --stage main_M", ""),
+    "lr": ("Experiment B: learning-rate check", "python cloud_run.py grid --stage lr", ""),
+    "heal": ("Experiment C: truncate, then train only the new factors", "python cloud_run.py heal", ""),
+    "bench": ("Measured speed and memory of every arm", "python cloud_run.py bench", ""),
+}
 
 
 def git(*args):
@@ -33,7 +60,28 @@ def code(text):
             "source": text.strip("\n").splitlines(keepends=True)}
 
 
+def carried_results():
+    """Finished result files on this machine, zipped and base64-encoded, plus their names."""
+    names, buf = [], io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for d in CARRY_DIRS:
+            for root, _, files in os.walk(d):
+                for f in sorted(files):
+                    if f.endswith(".json"):
+                        full = os.path.join(root, f)
+                        arc = full.replace(os.sep, "/")
+                        z.write(full, arc)
+                        names.append(arc)
+    return names, base64.b64encode(buf.getvalue()).decode("ascii")
+
+
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--run", default="throughput,posthoc", help="steps, in order: " + ", ".join(STEPS))
+    args = ap.parse_args()
+    plan = [x.strip() for x in args.run.split(",") if x.strip()]
+    for step in plan:
+        assert step in STEPS, f"unknown step {step!r}; choose from {list(STEPS)}"
     commit = git("rev-parse", "--short", "HEAD") or "unknown"
     dirty = bool(git("status", "--porcelain", "--", *FILES))
     stamp = commit + (" plus uncommitted changes" if dirty else "")
@@ -50,7 +98,7 @@ the version's **Output** tab and download `thin_gate_results.zip`.
 
 **Colab:** Runtime -> Change runtime type -> T4 GPU, then Runtime -> Run all. Keep the tab open; download
 `/content/thin_gate_results.zip` from the file browser at the end. Colab has one GPU and shorter sessions, so
-it will not finish all models in one go; run it again and finished models are skipped only within a session.
+it will not finish everything in one go. Unzip what it produced, rebuild the notebook, and run again.
 
 **What comes back:** small JSON result files and logs, zipped. Unzip into the project folder so the files
 land in `results/posthoc/` (and `results/train/` for the pilot), then commit them. No weights, no data.
@@ -103,30 +151,37 @@ try:
 except Exception:
     print("no HF_TOKEN secret: the gated Llama model will be skipped (fine)")
 """),
-        md("## 5. Check the machine: GPU, tests, smoke runs. Stops here if anything fails."),
+    ]
+
+    names, blob = carried_results()
+    if names:
+        listing = "\n".join(f"#   {n}" for n in names)
+        cells += [
+            md(f"## 5. Results from earlier sessions ({len(names)} files)\n"
+               "Cloud sessions start empty. These finished results were packed into the notebook when it was built, "
+               "so the runner skips them instead of computing them again."),
+            code("import base64, io, zipfile\n"
+                 f"{listing}\n"
+                 f"CARRIED = \"{blob}\"\n"
+                 "zipfile.ZipFile(io.BytesIO(base64.b64decode(CARRIED))).extractall(\".\")\n"
+                 f"print(\"restored {len(names)} finished result files\")"),
+        ]
+    else:
+        cells.append(md("## 5. Results from earlier sessions\nNone yet: this is the first session."))
+
+    cells += [
+        md("## 6. Check the machine: GPU, tests, smoke runs. Stops here if anything fails."),
         code("!python cloud_run.py check"),
-        md("""
-## 6. Experiment A: which projection tolerates rank reduction?
-Every model, whitened SVD then plain SVD, smallest model first, one queue per GPU. Expect roughly 7 to 8
-hours on two T4s. After each model the zip is refreshed, so an interrupted run still leaves usable results.
-The first line to look for: SmolLM2-135M baseline perplexity close to 17.46 (what the CPU measured).
-"""),
-        code("!python cloud_run.py posthoc"),
-        md("""
-## 7. Experiment B pilot (off by default)
-Set `RUN_PILOT = True` only after deciding that ALL of Experiment B runs on this kind of GPU: pilot runs
-made here in float16 must never be pooled with runs made elsewhere in bfloat16. The speed check runs first and
-says how long one run takes; if that is over about 1.5 hours, lower `TOKENS["S"]` in `grid.py`, rebuild this
-notebook, and start again, because the token budget cannot change once a grid has started.
-"""),
-        code("""
-RUN_PILOT = False
-if RUN_PILOT:
-    get_ipython().system("python cloud_run.py throughput")
-    get_ipython().system("python cloud_run.py pilot")
-else:
-    print("pilot skipped (RUN_PILOT = False)")
-"""),
+        md("## 7. This session's work\n"
+           "Planned steps, in order: **" + ", ".join(plan) + "**. After every finished job the zip is refreshed, so "
+           "a session that is cut off still leaves usable results. All of Experiment B runs on this kind of GPU: "
+           "runs made here in float16 must never be pooled with runs made elsewhere in bfloat16."),
+    ]
+    for step in plan:
+        heading, command, note = STEPS[step]
+        cells += [md(f"### {heading}" + (f"\n{note}" if note else "")), code("!" + command)]
+
+    cells += [
         md("## 8. Pack the results for download"),
         code("""
 !python cloud_run.py pack

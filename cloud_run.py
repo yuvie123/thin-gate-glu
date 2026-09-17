@@ -6,6 +6,9 @@ The notebook built by make_cloud_notebook.py calls this; it also works from any 
     python cloud_run.py posthoc       # Exp. A: every model, whitened then plain, one queue per GPU
     python cloud_run.py throughput    # Exp. B: 20M-token speed check, projects the cost of one run
     python cloud_run.py pilot         # Exp. B: the pilot stage of grid.py, runs spread over the GPUs
+    python cloud_run.py grid --stage main_S     # Exp. B: any other stage of grid.py
+    python cloud_run.py heal          # Exp. C: gate vs up vs down at the same rank, on the two small models
+    python cloud_run.py bench         # measured tokens/s and memory of every arm
     python cloud_run.py pack          # zip results/ and logs/ for download
 
 Add --dry to print what would run without running it. Finished runs are skipped, so a second call resumes.
@@ -39,7 +42,8 @@ MODELS = [
     ("HuggingFaceTB/SmolLM2-1.7B", 2),
 ]
 GATED = {"meta-llama/Llama-3.2-1B"}
-PACK_DIRS = ["results/posthoc", "results/train", "results/heal", "results/bench", "logs"]
+PACK_DIRS = ["results/posthoc", "results/train", "results/heal", "results/bench", "results/scratch", "logs"]
+HEAL_MODELS = ["HuggingFaceTB/SmolLM2-135M", "HuggingFaceTB/SmolLM2-360M"]      # as in README, Day 4-5
 ZIP_NAME = "thin_gate_results.zip"
 
 print_lock = threading.Lock()
@@ -47,8 +51,12 @@ pack_lock = threading.Lock()
 
 
 def say(msg):
+    line = f"[{time.strftime('%H:%M:%S')}] {msg}"
     with print_lock:
-        print(f"[{time.strftime('%H:%M:%S')}] {msg}", flush=True)
+        print(line, flush=True)
+        os.makedirs("logs", exist_ok=True)
+        with open(os.path.join("logs", "_runner.log"), "a") as f:      # so the zip tells the whole story
+            print(line, file=f)
 
 
 def out_dir():
@@ -237,13 +245,32 @@ def cmd_throughput(args):
         say("every arm and seed must use the same token budget, so it cannot change once a grid has started.")
 
 
-def cmd_pilot(args):
+def cmd_grid(args):
     from grid import command, runs_for
     ensure_data(args.dry)
     units = []
     for name, size, arm, seed, extra in runs_for(args.stage):
         cmd = command(name, size, arm, seed, extra) + compile_flag()
         units.append([(f"train__{name}", cmd, os.path.join("results", "train", f"{name}.json"))])
+    run_units(units, args.dry)
+
+
+def cmd_heal(args):
+    units = []
+    for model in HEAL_MODELS:
+        tag = model.replace("/", "__")
+        unit = []
+        for ptype in ("gate_proj", "up_proj", "down_proj"):      # same rank, same data order, same seed
+            cmd = [sys.executable, "heal.py", "--model", model, "--type", ptype, "--rank_frac", "0.25", "--whiten"]
+            expected = os.path.join("results", "heal", f"{tag}__{ptype}__r0.25__whiten__s0.json")
+            unit.append((f"heal__{tag}__{ptype}", cmd, expected))
+        units.append(unit)
+    run_units(units, args.dry)
+
+
+def cmd_bench(args):
+    units = [[(f"bench_{size}", [sys.executable, "bench.py", "--size", size] + compile_flag(),
+               os.path.join("results", "bench", f"bench_{size}.json"))] for size in ("S", "M")]
     run_units(units, args.dry)
 
 
@@ -254,10 +281,12 @@ def cmd_pack(args):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("what", choices=["check", "posthoc", "throughput", "pilot", "pack"])
+    ap.add_argument("what", choices=["check", "posthoc", "throughput", "pilot", "grid", "heal", "bench", "pack"])
     ap.add_argument("--models", default="", help="posthoc: comma-separated subset of the model list")
-    ap.add_argument("--stage", default="pilot", help="pilot: which grid.py stage to run")
+    ap.add_argument("--stage", default="pilot", help="grid: which grid.py stage to run")
     ap.add_argument("--dry", action="store_true")
     args = ap.parse_args()
-    {"check": cmd_check, "posthoc": cmd_posthoc, "throughput": cmd_throughput,
-     "pilot": cmd_pilot, "pack": cmd_pack}[args.what](args)
+    if args.what == "pilot":
+        args.stage = "pilot"
+    {"check": cmd_check, "posthoc": cmd_posthoc, "throughput": cmd_throughput, "pilot": cmd_grid,
+     "grid": cmd_grid, "heal": cmd_heal, "bench": cmd_bench, "pack": cmd_pack}[args.what](args)

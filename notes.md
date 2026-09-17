@@ -320,3 +320,27 @@ Looked inside the full texts of the must-read papers instead of only their abstr
   (2) if the Exp. B pilot runs in the cloud in float16, then ALL of Exp. B has to run there.
 - The CPU sweep that started at 16:21 keeps running. Its second half starts a new Python process that loads
   the edited `posthoc_truncate.py`; on a CPU `auto` still resolves to float32, so the run is unaffected.
+
+### 2026-09-17, about 17:15: decision, ALL GPU experiments run on Kaggle
+
+- **Decision (author):** the local RTX 3070 is not used for the experiments. Exp. A, B, C and the benchmark all
+  run on Kaggle T4s. Consequence accepted: Exp. B and C run in float16 with loss scaling, Exp. A in float32,
+  and the benchmark numbers are T4 numbers. The paper must say "T4", not "consumer GPU with 8 GB"; the ethics
+  and reproducibility statements and the setup section in `paper/main.tex` still describe the 3070 and need
+  changing once the first cloud results exist. WSL2 is no longer needed.
+- `heal.py` and `bench.py` now take `--amp_dtype` like `train.py` (shared helper `pick_amp_dtype` in
+  `train.py`), since both hard-coded bfloat16. Checked after the change: `tests.py` 6/6; the train smoke
+  validation curve is still identical to the original file; `heal.py --smoke` passes in both precisions;
+  `bench.py --smoke` passes.
+- `cloud_run.py` gained `grid --stage`, `heal` and `bench`, writes its own console lines to `logs/_runner.log`,
+  and packs `results/scratch` so the speed-check result comes back. `make_cloud_notebook.py` gained `--run`
+  (the session's plan) and packs every finished result under `results/` INTO the notebook, because a Kaggle
+  session starts empty and the runner can only skip what it can see. Tested with a fake result file.
+- **Session plan (times are estimates, nothing on a T4 has been measured yet):** 1) speed check + Exp. A,
+  7-8 h; then fix `TOKENS["S"]` from the measured tokens/s, before any grid run (rule 3); 2) pilot, 6 runs;
+  3-4) `main_S`, 27 further runs; then `heal` and `bench`. Kaggle's free quota was about 30 GPU-hours a week
+  when last checked, which would cover sessions 1-2 this week and `main_S`, `heal`, `bench` next week, but
+  probably NOT size M. If the quota is what it was, Exp. B is a one-size experiment unless more GPU time is
+  found; say so in the limitations rather than shrinking seeds to squeeze M in.
+- Risk carried: the float16 training path has never run on a real GPU. Its first test is the smoke run in
+  the notebook's check step, and its second is the 20M-token speed check, both in session 1 and both cheap.

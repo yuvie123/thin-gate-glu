@@ -61,6 +61,15 @@ def get_args():
     return ap.parse_args()
 
 
+def pick_amp_dtype(device, choice="auto"):
+    """Autocast precision: bfloat16 where it is native (the CPU, Ampere-or-newer GPUs), float16 on older
+    GPUs such as the T4. float16 needs loss scaling; callers enable a GradScaler exactly when this returns it."""
+    if choice != "auto":
+        return getattr(torch, choice)
+    old_gpu = device == "cuda" and torch.cuda.get_device_capability()[0] < 8
+    return torch.float16 if old_gpu else torch.bfloat16
+
+
 def lr_at(step, total_steps, args):
     if step < args.warmup_steps:
         return args.lr * (step + 1) / args.warmup_steps
@@ -119,11 +128,7 @@ def main():
         lr=args.lr, betas=(0.9, 0.95), fused=(device == "cuda"),
     )
 
-    if args.amp_dtype == "auto":
-        old_gpu = device == "cuda" and torch.cuda.get_device_capability()[0] < 8
-        amp_dtype = torch.float16 if old_gpu else torch.bfloat16
-    else:
-        amp_dtype = getattr(torch, args.amp_dtype)
+    amp_dtype = pick_amp_dtype(device, args.amp_dtype)
     autocast = torch.autocast(device_type=device, dtype=amp_dtype)
     # float16 has a narrow exponent range, so its gradients need loss scaling. With bfloat16 the scaler is
     # disabled and every call below passes straight through, so that path is unchanged.
