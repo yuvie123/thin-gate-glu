@@ -138,18 +138,20 @@ def run(model, eval_blocks, calib_blocks, args):
 def main():
     args = get_args()
     device = "cuda" if torch.cuda.is_available() else "cpu"
+    # bf16 is native on the GPU, but Zen-2 CPUs emulate it and become unusably slow, so use fp32 there.
+    dtype = torch.bfloat16 if device == "cuda" else torch.float32
 
     if args.smoke:
         from transformers import LlamaConfig, LlamaForCausalLM
         torch.manual_seed(0)
         cfg = LlamaConfig(vocab_size=256, hidden_size=64, intermediate_size=192, num_hidden_layers=2,
                           num_attention_heads=2, num_key_value_heads=2, max_position_embeddings=128)
-        model = LlamaForCausalLM(cfg).to(device).eval()
+        model = LlamaForCausalLM(cfg).to(device=device, dtype=dtype).eval()
         eval_blocks = torch.randint(0, 256, (8, 64))
         calib_blocks = torch.randint(0, 256, (8, 64))
         args.model, args.out_dir = "smoke-random-llama", "results/smoke"
     else:
-        model, tok = load_model(args.model, device=device)
+        model, tok = load_model(args.model, dtype=dtype, device=device)
         eval_blocks = tokenize_blocks(tok, eval_text(args.dataset, "test"), args.seq_len, args.max_eval_blocks or None)
         calib_blocks = None
         if args.whiten:
@@ -167,6 +169,7 @@ def main():
         "n_params": sum(p.numel() for p in model.parameters()),
         "base_ppl": base_ppl, "records": records,
         "device": torch.cuda.get_device_name(0) if device == "cuda" else "cpu",
+        "dtype": str(dtype).replace("torch.", ""),
     }
     os.makedirs(args.out_dir, exist_ok=True)
     path = os.path.join(args.out_dir, f"{args.model.replace('/', '__')}__{args.dataset}__{result['method']}.json")
