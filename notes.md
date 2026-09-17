@@ -249,3 +249,19 @@ The abstract stays numbers-free and neutral about the direction.
 - Status against the original goal (a small but real contribution): not reached yet. There is a novel,
   well-controlled question, working code, and one encouraging probe. There is no paper-grade result, no
   read literature, no BibTeX, and the GPU question is open.
+
+### 2026-09-17, 16:21: Exp. A CPU sweep relaunched, detached
+
+- **Launched** (author asked for it): SmolLM2-135M, full wikitext-2 test split (297 windows), all three
+  projection types, default rank fractions, CPU fp32. Whitened first, then plain, because the whitened
+  figure is the one the go/no-go rests on and an interrupted run should lose the less important half.
+- Differences from the run that was lost, all deliberate: (1) started outside the terminal session
+  (`Win32_Process.Create`), so closing a window cannot kill it; a reboot still can. (2) Output goes to
+  `results/scratch/posthoc_cpu/`, never `results/posthoc/`. (3) 4 threads at below-normal priority, because
+  the PC is in use; measured in the probe at about 1.7 s per window, the same as 8 threads gave earlier.
+  (4) Windows sleep on AC is off. Launcher: `results/scratch/run_cpu_sweep.cmd`. Progress:
+  `results/logs/cpu_sweep_status.txt` and `results/logs/posthoc_135M_{whiten,plain}.log` (none in git).
+- Expected: about 3 h per variant, about 6 h in total, longer while the machine is busy.
+- These are an early look, not paper numbers. The 135M model gets rerun on the GPU in bf16 with the other
+  models if the GPU route goes ahead; if it never does, moving these into `results/posthoc/` is a decision
+  to take and log then, with the CPU/fp32 provenance stated in the paper.
