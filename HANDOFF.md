@@ -19,7 +19,16 @@ Read `README.md` (commands, go/no-go criteria, honesty rules) and `PLAN.md` (ide
   self-contained notebook with the code and all finished results inside; the author uploads it, runs it,
   downloads `thin_gate_results.zip`, unzips it here. Exp. A is float32, Exp. B/C float16 with loss
   scaling, all on T4s; never pool with runs from another GPU or precision. Session plan in `README.md`
-  and `notes.md`. Nothing has run on a T4 yet. Windows sleep on AC is set to never.
+  and `notes.md`. Windows sleep on AC is set to never.
+- **Running now (started 2026-09-17):** (a) Kaggle session 1, speed check + Exp. A on all ungated models,
+  started by the author about 17:00 EDT, expected 7-8 h (an estimate; nothing had run on a T4 before it).
+  The author will drop `thin_gate_results.zip` into this folder without unzipping it; unzip it yourself with Python's
+  `zipfile` into the repo root so files land in `results/posthoc/`, `results/scratch/`, `logs/`. First check
+  `logs/_runner.log`: the three smoke lines must say ok, and the SmolLM2-135M baseline must be near 17.46.
+  (b) A CPU sweep of Exp. A on SmolLM2-135M, detached from any session, started 16:21, about 8.5 h, whitened
+  first; progress in `results/logs/cpu_sweep_status.txt` and `results/logs/posthoc_135M_*.log`, output in
+  `results/scratch/posthoc_cpu/`. It is an early look only and never goes into `results/posthoc/`.
+  `plot.py` needs matplotlib, which is not yet installed in the Windows `.venv`.
 - **Novelty narrowed 2026-09-17:** WeLore (arXiv 2407.11239, ICML 2025) already reports that `gate_proj` is
   more low-rank than `up_proj`/`down_proj` in pretrained LLMs. Exp. A is therefore a controlled test of a
   known observation; the novel part is Exp. B (thin gate from scratch, with controls), which needs a GPU.
@@ -27,9 +36,8 @@ Read `README.md` (commands, go/no-go criteria, honesty rules) and `PLAN.md` (ide
 - **First evidence (probe only, not for the paper):** on SmolLM2-135M, 8 windows, the gate tolerated
   truncation best in 5 of 6 settings and beat the up-projection in all 6; gate vs down crosses over at
   the lowest rank under whitening. Table in `notes.md`. Encouraging, one model, proves nothing yet.
-- **No paper-grade experiment result exists yet.** A CPU fallback sweep of Exp. A (SmolLM2-135M, fp32) was started
-  and lost after 2 of 18 configs when the session that owned it was closed; it was deliberately not
-  relaunched. What it did establish: the evaluation is sound (full-split baseline perplexity **17.463**,
+- **No paper-grade experiment result exists yet.** An earlier CPU sweep was lost after 2 of 18 configs when
+  the session that owned it was closed (hence the detached relaunch above). What the CPU work established: the evaluation is sound (full-split baseline perplexity **17.463**,
   plausible tens), and two real bugs are fixed (`Salesforce/wikitext` dataset id under datasets>=4;
   fp32 instead of emulated bf16 on CPU). The Windows `.venv` (Python 3.12, torch CPU) is an interim
   tool, not the machine of record. Never write CPU results into `results/posthoc/`. See `notes.md`.
@@ -44,11 +52,15 @@ Read `README.md` (commands, go/no-go criteria, honesty rules) and `PLAN.md` (ide
   author must claim the exemption there or risk desk rejection. License is CC BY 4.0 (the only option).
   Still missing: the Primary Area dropdown options.
 
+- Alternative venues and their deadlines (AISTATS Oct 6, ARR Oct 12, CPAL Dec 5, TMLR rolling) are tabulated in
+  `notes.md`. The author is weighing ICLR on Sep 25 against withdrawing (deleted if before Sep 25) and
+  aiming at CPAL or TMLR with a fuller paper. Decide at the Sunday go/no-go; it is the author's call.
+
 ### Next, in order
 1. **File the abstract form by Friday evening** (hard limit Sat Sep 19, 7:59 AM EDT) from
    `paper/openreview_abstract_form.md`.
-2. Kaggle session 1: upload `cloud_notebook.ipynb` (speed check + Exp. A). Check the log for the 135M
-   baseline near 17.46. Unzip the results here, commit, run `python plot.py`.
+2. Kaggle session 1 is running. When the zip arrives: unzip, verify, `git add results`, commit, push, install
+   matplotlib, run `python plot.py`, and report gate vs up vs down per model plainly, whichever way it points.
 3. Fix `TOKENS["S"]` in `grid.py` from the measured tokens/s, BEFORE any grid run; rerun `tests.py`.
 4. Session 2: `--run pilot`. Sunday 6 pm: go/no-go on the Exp. A figure plus the pilot.
 5. Sessions 3-4: `--run main_S`, then `--run heal,bench`. Experiments freeze Wed Sep 23 noon.
