@@ -25,7 +25,8 @@ def eval_text(dataset, split_hint="test"):
     """Returns one long evaluation string. wikitext2: the standard test split. c4: the usual validation file."""
     from datasets import load_dataset
     if dataset == "wikitext2":
-        ds = load_dataset("wikitext", "wikitext-2-raw-v1", split=split_hint)
+        # "Salesforce/wikitext" is the canonical id; datasets>=4 rejects the bare legacy name "wikitext".
+        ds = load_dataset("Salesforce/wikitext", "wikitext-2-raw-v1", split=split_hint)
         return "\n\n".join(ds["text"])
     if dataset == "c4":
         ds = load_dataset("allenai/c4", data_files={"validation": "en/c4-validation.00000-of-00008.json.gz"},
