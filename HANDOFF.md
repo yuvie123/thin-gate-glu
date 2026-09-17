@@ -14,6 +14,7 @@ Read `README.md` (commands, go/no-go criteria, honesty rules) and `PLAN.md` (ide
 
 ## Status (update this section as work proceeds)
 - 2026-09-17: all code written and smoke-tested on CPU only. `tests.py` passes (6 tests). **No real experiment has run; `results/` is empty.** `setup_pc.sh` has only been syntax-checked, never executed; expect to debug it.
+- 2026-09-17, later: first session on the GPU PC itself. `nvidia-smi` is healthy (RTX 3070, 8 GB, driver 560.94) but **WSL2 is not installed at all** (no distribution; `wsl` only prints its usage stub), and the Windows-side Python is 3.8. So `setup_pc.sh` still has not run and `results/` is still empty. See `notes.md`.
 - Next: finish `setup_pc.sh`, then the Day 1 commands in `README.md` (Exp. A on SmolLM2-135M, data download, throughput check, overnight pilot grid in tmux).
 
 ## Rules for this project (non-negotiable)
