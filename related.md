@@ -55,10 +55,41 @@ and the searches at the bottom of this file are still unrun.
 - [ ] Contextual sparsity with low-rank predictors of active MLP neurons (Deja Vu and follow-ups): find the ids
 - [ ] GLU variants paper (origin of SwiGLU): find the id
 
+## Found by the searches of 2026-09-17 (ids verified on the arXiv page; NONE read yet)
+
+Same convention as above: `[id verified]` = id, title, authors and venue checked on the page; `[ ]` = unread.
+What is said about each paper below comes from its abstract or from one targeted look at its HTML, so
+treat it as a pointer to where to read, not as a finding you can cite.
+
+**Closest neighbours (read right after the four must-reads):**
+- [ ] **arXiv 2606.00573** `[id verified]` -- "LASER: Loss-Aware Singular-value Decomposition and Rank
+  Allocation for Efficient Low-Precision Vision-Language Models", Wang, Wang, Li, Ren, Zhang (30 May 2026,
+  no venue listed). Post-hoc compression of VLMs. **Its FFN scheme is asymmetric: Sec. 3.5 / Algorithm 1
+  apply SVD to the gate AND up projections together, on the same selected hidden channels, keep the
+  remaining channels dense, and leave the down projection dense (quantized).** So it is input-side vs
+  output-side, not gate vs content, and it is not gate-only. No ablation comparing gate vs up vs down was
+  found. *Read Sec. 3.5: why do they spare down? That reasoning is the nearest thing to ours.*
+- [ ] **arXiv 2510.09332** `[id verified]` -- "FLRC: Fine-grained Low-Rank Compressor for Efficient LLM
+  Inference", Lu, Chen, Chang, Hu, Wu. **EMNLP 2025.** Fisher-based per-projection rank allocation.
+  **Appendix A, Figure 2 plots importance scores for every projection type in Llama-3-8B by layer**; the
+  caption names `down_proj` as high-importance (compress less). The text gives no gate-vs-up ordering and
+  no functional explanation, but the figure may show one. *Look at that figure: where do the gate_proj
+  points sit relative to up_proj? This is prior per-matrix evidence and must be cited next to Exp. A
+  whichever way it points.*
+- [ ] **arXiv 2506.23225** `[id verified]` -- "Masked Gated Linear Unit", Tajima, Inoue, Sekikawa, Sato,
+  Yokota (29 Jun 2025, no venue listed). Removes the separate gate matrix altogether: gate and value
+  streams share ONE weight matrix through learned binary masks (MoEG), to cut memory reads. No low-rank
+  gate. A different answer to the same question ("does the gate deserve a full matrix of its own?"), so
+  it belongs in Related Work and possibly as a baseline to discuss.
+
+**SVD-compression papers surfaced by the same searches (ids NOT yet verified; check appendices for
+per-projection results):** arXiv 2605.15626 (IO-SVD), arXiv 2602.03051 (SAES-SVD), arXiv 2601.07839
+(hierarchical sparse plus low-rank), arXiv 2505.21732 (LaX, low-rank training).
+
 ## Searches still to run (arXiv, Semantic Scholar, OpenReview incl. ICLR 2026 submissions, Google Scholar "cited by" on 2406.16450)
-- "low-rank gate" GLU / SwiGLU
-- "factorized gate" feed-forward
-- "asymmetric GLU" / "narrow gate" / "thin gate"
+- [ran 2026-09-17, web search over arXiv] "low-rank gate" GLU / SwiGLU -- no gate-only paper found
+- [ran 2026-09-17, web search over arXiv] "factorized gate" feed-forward -- no gate-only paper found
+- [ran 2026-09-17, web search] "asymmetric GLU" / "narrow gate" / "thin gate" -- nothing relevant at all
 - "gate projection" rank / compressibility / sensitivity
 - "which FFN matrix" low-rank ablation
 
