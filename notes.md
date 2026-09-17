@@ -118,3 +118,32 @@ neighbour makes the selection-vs-content argument in attention rather than in th
 abstract-level check: the per-matrix ablations in 2406.16450 and 2609.15037 could still contain the
 gate/up/down result, and that can only be settled by reading their methods and appendices. The five
 searches at the bottom of `related.md` are still unrun. No BibTeX was written, and no box was ticked.
+
+### 2026-09-17, about 15:50: the CPU sweep was lost; WSL2 brought forward
+
+- **Failure.** The Exp. A CPU sweep launched at 15:10 died at about 15:29. It was a child process of the
+  terminal session that launched it, that session was closed by accident, and the sweep went with it.
+  2 of 18 configs had finished: baseline 17.463, `gate_proj` rank 432 ppl 40.505 (x2.32), rank 288
+  ppl 1011.630 (x57.93). `posthoc_truncate.py` writes its JSON only after the last config, so **no
+  result file exists**. About 20 minutes of a ~6.5 h run were lost. The partial log stays in
+  `results/logs/` (not in git). Those numbers are log lines only, agree with the 8-window probe above,
+  and must not be used anywhere.
+- Lesson: a long job must never be a child of an interactive session. Rule 6 already says `tmux`; the
+  Windows side has no `tmux`, which is one more reason to move to WSL2 rather than patch around it.
+- **Found while checking, fixed:** the PC was set to sleep after 30 minutes idle on AC power, which
+  would have frozen any long run the first time the machine was left alone. Now set to never
+  (`powercfg /change standby-timeout-ac 0`, verified 0). Still to do by hand: pause Windows Update for
+  a week, since an automatic overnight restart kills a run just as surely.
+- **Found while checking, avoided:** the sweep was writing to `results/posthoc/`. `run_posthoc.sh`
+  skips a model whose JSON already exists there, and `plot.py` reads everything under `results/`
+  except `smoke/` and `scratch/`. So the CPU fp32 result would later have blocked the GPU bf16 rerun
+  of SmolLM2-135M and appeared in the paper figure next to GPU numbers, the exact mixing ruled out
+  above. Any future CPU run must pass `--out_dir results/scratch/<something>`.
+- **Decision (author): do not relaunch the CPU sweep; install WSL2 now.** With the sweep dead, the only
+  reason to postpone the reboot is gone. The GPU repeats this sweep in minutes, for several models, in
+  the dtype the paper will use, and the overnight pilot grid can start tonight instead of tomorrow.
+  The pilot grid is on the critical path to the Sunday go/no-go; the CPU sweep never was, because the
+  135M model had to be rerun on the GPU anyway.
+- Nothing else was lost: the working tree was clean and in sync with the remote.
+- Also decided: the five unrun searches at the bottom of `related.md` get run now, recorded with the
+  same discipline as the id check (verified on the paper's own page, no BibTeX, no read box ticked).

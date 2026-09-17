@@ -14,25 +14,40 @@ Read `README.md` (commands, go/no-go criteria, honesty rules) and `PLAN.md` (ide
 
 ## Status (update this section as work proceeds)
 - 2026-09-17 (Day 0): all experiment code written; `tests.py` passes (6 tests).
-- On the GPU PC: `nvidia-smi` healthy (RTX 3070, 8 GB, driver 560.94) but **WSL2 is not installed at all**,
-  so `setup_pc.sh` has still never run and Exp. B, Exp. C and `bench.py` are blocked. Installing WSL2
-  needs an elevated shell and a reboot.
-- 2026-09-17 evening: **Exp. A is running on the Windows CPU** as a fallback, since it is training-free and
-  needs no GPU. Python 3.12 + torch 2.14.0+cpu in `.venv`; `tests.py` 6/6 here. Full-split baseline
-  perplexity for SmolLM2-135M is **17.463**, plausible tens, so the evaluation is sound. Two real bugs
-  fixed: the `wikitext` dataset id (needs `Salesforce/wikitext` under datasets>=4) and bf16 on CPU. Only
-  the 135M model is CPU-feasible. See `notes.md`.
+- GPU PC: `nvidia-smi` healthy from Windows (RTX 3070, 8 GB, driver 560.94). **WSL2 install is in
+  progress** (decided 2026-09-17 ~15:50): `wsl --install -d Ubuntu-24.04` in an elevated PowerShell,
+  reboot, create the Linux user. Until `setup_pc.sh` has run inside Ubuntu, Exp. A on GPU, Exp. B,
+  Exp. C and `bench.py` are all blocked. Windows sleep on AC is now set to never.
+- **No experiment result exists yet.** A CPU fallback sweep of Exp. A (SmolLM2-135M, fp32) was started
+  and lost after 2 of 18 configs when the session that owned it was closed; it was deliberately not
+  relaunched. What it did establish: the evaluation is sound (full-split baseline perplexity **17.463**,
+  plausible tens), and two real bugs are fixed (`Salesforce/wikitext` dataset id under datasets>=4;
+  fp32 instead of emulated bf16 on CPU). The Windows `.venv` (Python 3.12, torch CPU) is an interim
+  tool, not the machine of record. Never write CPU results into `results/posthoc/`. See `notes.md`.
 - Paper: title and the numbers-free abstract are submission-ready; the AI-use, ethics and reproducibility
-  statements are now written. 12 `	odo`s remain, all needing results or reading. **`references.bib` is
+  statements are written. 12 `\todo`s remain, all needing results or reading. **`references.bib` is
   still empty and no paper in `related.md` has been read yet** -- the biggest risk to Sep 25, ahead of the
-  experiments.
+  experiments. The four must-read arXiv ids are verified against their pages (ids only, not read).
 - OpenReview form inspected 2026-09-17. The PDF is NOT required at the abstract deadline, but Title,
   Authors, Keywords, Abstract, Primary Area, Code of Ethics, Paper Visibility, Submission Requirements,
   Reciprocal Reviewing Author, Reciprocal Reviewing Exemption, AI Assistance and License all are.
   **The reciprocal-reviewing fields cannot be changed after the abstract deadline**, and a first-time
-  author must claim the exemption there or risk desk rejection.
-- Next: fill the abstract form before Sat 07:59 EDT (still needs the Primary Area options); let the CPU
-  sweep finish; then WSL2 + `setup_pc.sh`, then the grid.
+  author must claim the exemption there or risk desk rejection. License is CC BY 4.0 (the only option).
+  Still missing: the Primary Area dropdown options.
+
+### Next, in order (pick up here after the reboot)
+1. Inside Ubuntu: `nvidia-smi` must show the RTX 3070. Then the `SETUP_PC.md` shortcut: `gh auth login`,
+   clone under `~/thin-gate` (never `/mnt/c`), `bash ~/thin-gate/setup_pc.sh`. The CUDA check must print
+   `True`; if not, stop and fix that first.
+2. `python tests.py` (6/6), `python train.py --smoke`, `python posthoc_truncate.py --smoke`.
+3. In `tmux`, one GPU job at a time: Exp. A on SmolLM2-135M, plain. **Baseline perplexity must be in the
+   tens** (CPU fp32 gave 17.463; bf16 will be close, not identical). Then `--whiten`, then the same pair
+   for SmolLM2-360M and Qwen2.5-0.5B.
+4. `python data.py --num_train_shards 6`, the 20M-token throughput check, then fix `TOKENS["S"]` in
+   `grid.py` so one S run is at most ~1.5 h, before any grid starts.
+5. `python grid.py --stage pilot --run` overnight in `tmux`, from an Ubuntu terminal window that stays
+   open (WSL can stop an idle distro once its last terminal closes). Check it survives detaching.
+6. Alongside: file the abstract form by Friday evening (hard limit Sat 07:59 EDT); pause Windows Update.
 
 ## Rules for this project (non-negotiable)
 1. **Never fabricate or guess** results, citations, or benchmark numbers. Every number in the paper comes from a JSON in `results/` via `plot.py`. `paper/references.bib` entries are exported by the author from the paper's own page after reading it, never written from memory.
