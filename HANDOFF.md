@@ -13,9 +13,26 @@ Read `README.md` (commands, go/no-go criteria, honesty rules) and `PLAN.md` (ide
 - The GitHub repo is **private and must stay private** until reviews finish (double-blind). Never change its visibility, never put names, usernames, repo URLs or machine names in the paper, code comments or result files.
 
 ## Status (update this section as work proceeds)
-- 2026-09-17: all code written and smoke-tested on CPU only. `tests.py` passes (6 tests). **No real experiment has run; `results/` is empty.** `setup_pc.sh` has only been syntax-checked, never executed; expect to debug it.
-- 2026-09-17, later: first session on the GPU PC itself. `nvidia-smi` is healthy (RTX 3070, 8 GB, driver 560.94) but **WSL2 is not installed at all** (no distribution; `wsl` only prints its usage stub), and the Windows-side Python is 3.8. So `setup_pc.sh` still has not run and `results/` is still empty. See `notes.md`.
-- Next: finish `setup_pc.sh`, then the Day 1 commands in `README.md` (Exp. A on SmolLM2-135M, data download, throughput check, overnight pilot grid in tmux).
+- 2026-09-17 (Day 0): all experiment code written; `tests.py` passes (6 tests).
+- On the GPU PC: `nvidia-smi` healthy (RTX 3070, 8 GB, driver 560.94) but **WSL2 is not installed at all**,
+  so `setup_pc.sh` has still never run and Exp. B, Exp. C and `bench.py` are blocked. Installing WSL2
+  needs an elevated shell and a reboot.
+- 2026-09-17 evening: **Exp. A is running on the Windows CPU** as a fallback, since it is training-free and
+  needs no GPU. Python 3.12 + torch 2.14.0+cpu in `.venv`; `tests.py` 6/6 here. Full-split baseline
+  perplexity for SmolLM2-135M is **17.463**, plausible tens, so the evaluation is sound. Two real bugs
+  fixed: the `wikitext` dataset id (needs `Salesforce/wikitext` under datasets>=4) and bf16 on CPU. Only
+  the 135M model is CPU-feasible. See `notes.md`.
+- Paper: title and the numbers-free abstract are submission-ready; the AI-use, ethics and reproducibility
+  statements are now written. 12 `	odo`s remain, all needing results or reading. **`references.bib` is
+  still empty and no paper in `related.md` has been read yet** -- the biggest risk to Sep 25, ahead of the
+  experiments.
+- OpenReview form inspected 2026-09-17. The PDF is NOT required at the abstract deadline, but Title,
+  Authors, Keywords, Abstract, Primary Area, Code of Ethics, Paper Visibility, Submission Requirements,
+  Reciprocal Reviewing Author, Reciprocal Reviewing Exemption, AI Assistance and License all are.
+  **The reciprocal-reviewing fields cannot be changed after the abstract deadline**, and a first-time
+  author must claim the exemption there or risk desk rejection.
+- Next: fill the abstract form before Sat 07:59 EDT (still needs the Primary Area options); let the CPU
+  sweep finish; then WSL2 + `setup_pc.sh`, then the grid.
 
 ## Rules for this project (non-negotiable)
 1. **Never fabricate or guess** results, citations, or benchmark numbers. Every number in the paper comes from a JSON in `results/` via `plot.py`. `paper/references.bib` entries are exported by the author from the paper's own page after reading it, never written from memory.

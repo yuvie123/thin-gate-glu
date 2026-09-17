@@ -11,3 +11,6 @@ paper/*.log
 paper/*.bbl
 paper/*.blg
 paper/*.out
+Screenshot*.png
+results/scratch/
+results/logs/

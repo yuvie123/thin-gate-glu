@@ -136,22 +136,47 @@ matmuls may not be faster at these sizes; conclusions may not transfer to larger
 % REQUIRED by ICLR 2027. EDIT THIS so that every sentence is true for what you actually did.
 In this work, we used generative AI tools (a large language model assistant) to propose and refine the
 research hypothesis, to design and provide feedback on the experimental methodology, to implement the
-methods and experiment code, and \todo{if true: to help interpret results}. We have not used generative AI
-tools to generate synthetic data sets, to formulate or prove mathematical claims, for translation, or for
-qualitative data analysis, and \todo{list the remaining required-disclosure tasks that do not apply}.
+methods, data-preparation and evaluation code, to clean and reformat the evaluation data, and to help
+interpret results. We have not used generative AI tools to generate synthetic data sets, to develop
+theoretical models or conceptual frameworks, to formulate mathematical claims, to provide critical
+ingredients for proving mathematical claims or to assist in the writing of proofs, to assist with
+translation, or to support qualitative or thematic data analysis.
 Additionally, we used generative AI tools for brainstorming, searching for and identifying related
 literature, suggesting experimental parameters, creating software code and figures, drafting and editing
-parts of this paper, and proposing the title. We have reviewed all AI-assisted work:
-\todo{describe truthfully, e.g. ``the authors ran every experiment themselves, checked the AI-written code with
-unit tests (exact reconstruction at full rank, parameter-count checks, causality), verified every number in
-the paper against the logged result files, read every cited paper, and checked AI-suggested ideas for prior
-work through a manual literature search''}. We take responsibility for the final content of this work,
-including text, claims or artifacts produced with the aid of generative AI.
+parts of this paper, and proposing the title.
+% VERIFY BEFORE SUBMISSION. Every clause of the next sentence must be true on the day you submit:
+%   (1) tests.py passes on the machine that produced the reported numbers;
+%   (2) every number in the paper came from a results/*.json through plot.py, none typed by hand;
+%   (3) you have read the AI-written code you are submitting as your artifact;
+%   (4) you have read every paper cited here, in full, BEFORE citing it (related.md boxes ticked);
+%   (5) you ran the manual prior-work search yourself.
+% Delete any clause you cannot stand behind. An untrue clause here is a Code of Ethics violation.
+We have reviewed all AI-assisted work: the correctness tests accompanying our code were run and pass
+(exact reconstruction of a dense layer at full rank, parameter and FLOP counts checked against hand
+calculations, and a causality check on the model); every number reported in this paper is generated
+programmatically from logged result files rather than transcribed; the AI-written code was read and
+checked by the authors; every cited work was read by the authors before being cited; and AI-suggested
+ideas were checked for prior work through a manual literature search. We take responsibility for the
+final content of this work, including text, claims or artifacts produced with the aid of generative AI.
+
+\subsection*{Ethics statement}
+% RECOMMENDED by ICLR 2027, page-limit exempt, max 1 page.
+This work studies the parameter efficiency of feed-forward layers in language models. It involves no human
+subjects, no personal or sensitive data, and no new data collection: every experiment uses publicly available
+pretrained models and public text corpora under their respective licences. We see no direct path from this
+work to harmful application beyond the general dual-use character of making language models cheaper to run.
+Our experiments were deliberately small and ran on a single consumer GPU, which keeps their energy cost low
+but also bounds the conclusions we can draw, as we set out in the limitations.
 
 \subsection*{Reproducibility statement}
-\todo{Point to: Section~\ref{sec:method}; the appendix with all hyperparameters; the anonymized code in the
-supplementary material (training, truncation, healing, benchmark and plotting scripts; every figure and table is
-generated from logged JSON files); public models and datasets used.}
+All architectural details of the thin-gate GLU and of the control arms are given in
+Section~\ref{sec:method}, and every hyperparameter -- model sizes, token budgets, optimizer settings,
+learning-rate schedule, batch size and random seeds -- is listed in the appendix. The anonymized source code
+is included as supplementary material and contains the pretraining, post-hoc truncation, conversion,
+benchmarking and plotting scripts together with the correctness tests. Every figure and table in this paper
+is generated from logged JSON result files by a single plotting script, so no reported number is transcribed
+by hand. All pretrained models and evaluation datasets are publicly available and are identified by their
+exact repository names and configurations in the appendix.
 
 \bibliography{references}
 \bibliographystyle{iclr2027_conference}

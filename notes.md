@@ -61,3 +61,38 @@ zero-shot evaluations and is the dependency most likely to fight `transformers`.
   projection types, default rank fractions. Logs in `results/logs/`. Expected around 6 h total.
   Only the 135M model is CPU-feasible; 360M would be roughly 8 h per variant and 1.7B far beyond
   reach, so the larger models in the abstract still need the GPU.
+
+### 2026-09-17, evening: ICLR submission requirements checked against the real form
+
+Read the actual OpenReview submission form (screenshots, kept out of git: they carry the author name).
+This corrected an earlier assumption taken from the Author Guidelines page, which says only the Abstract
+field is mandatory. On the real form the PDF is indeed optional, but many other fields are required.
+
+- Required at the abstract deadline (Sep 19, 07:59): Title, Authors, **Keywords**, Abstract,
+  **Primary Area**, Code of Ethics, Paper Visibility, Submission Requirements, **Reciprocal Reviewing
+  Author**, **Reciprocal Reviewing Exemption**, **AI Assistance**, License.
+  Optional: TL;DR, PDF (max 50 MB), Supplementary Material (max 100 MB, zipped, must be anonymized),
+  Recent Qualifying Paper, Ready For LLM Feedback.
+- **The reciprocal-reviewing fields cannot be changed after the abstract deadline.** The form resolves
+  the ambiguity found earlier: "If the submission has no eligible reciprocal reviewer, simply enter any
+  author in this field", and there is a Reciprocal Reviewing Exemption dropdown whose stated example
+  reason is exactly "no authors are qualified to be reviewers because they are first-time authors".
+  So the first-time-author path is an explicit exemption request, not an automatic exemption. Getting
+  this wrong is a desk rejection at the Program Chairs' discretion, and it is unfixable after Saturday.
+- Paper Visibility acknowledgement is stricter than expected: submitted papers become public at the
+  START of review, accepted and rejected papers are de-anonymized at the end, withdrawn papers are
+  de-anonymized immediately on withdrawal, and papers cannot be deleted, hidden or retracted once
+  reviewing begins. Decide before submitting, not after.
+- AI Assistance is a required checkbox list. The truthful selections for this project are: aid or polish
+  writing; retrieval and discovery; research ideation or execution; draft sections of the paper. Not
+  ticked: generating synthetic datasets; proving mathematical claims.
+- Written in `paper/main.tex`: the AI use statement now covers the full required-disclosure list split
+  into used and not-used, a new Ethics statement section, and a real Reproducibility statement.
+  `\todo` count is down from 18 to 12; the rest all need results or reading. A comment block above the
+  AI-use review sentence lists the five things that must be TRUE before submitting, since that sentence
+  currently claims verification the author has not yet done (notably: no cited paper has been read).
+- Housekeeping: `paper/TEMPLATE_INSTRUCTIONS.tex` had been moved to the repo root at some point and was
+  showing as a tracked deletion. Content was identical apart from line endings, so it was restored to
+  `paper/`. Screenshots and `results/scratch|logs` added to `.gitignore`.
+- Still blocked on the author: the Primary Area dropdown options and the License options were not
+  captured in the screenshots, so neither can be chosen yet.
