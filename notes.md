@@ -96,3 +96,25 @@ field is mandatory. On the real form the PDF is indeed optional, but many other 
   `paper/`. Screenshots and `results/scratch|logs` added to `.gitignore`.
 - Still blocked on the author: the Primary Area dropdown options and the License options were not
   captured in the screenshots, so neither can be chosen yet.
+
+### 2026-09-17, evening: arXiv ids verified for the four must-read papers
+
+License for the submission: **CC BY 4.0** (the only option the form offers).
+
+Checked each must-read id against its arXiv page rather than trusting the search results that produced
+`related.md`. All four ids are correct, and two gained venue information that changes how they must be
+cited (`references.bib` says prefer the published version):
+
+- 2406.16450 -- "Building on Efficient Foundations: Effectively Training LLMs with Structured Feedforward
+  Layers", Wei/Moalla/Pascanu/Gulcehre, **NeurIPS 2024**.
+- 2407.09835 -- "Investigating Low-Rank Training in Transformer Language Models", same authors,
+  **ICML 2024 workshop** (not main-conference). Same group as the above; read the two together.
+- 2603.04427 -- "Thin Keys, Full Values: Reducing KV Cache via Low-Dimensional Attention Selection",
+  Yao/Chen/Murtadha/Wang, Feb 2026. Confirmed **attention only**, no MLP/GLU content.
+- 2609.15037 -- "MoARa: Module-Aware Rank Allocation ...", Kim/Kwak, **EMNLP 2026 Main**.
+
+**Novelty: not contradicted, not established.** None of the four factorizes only the gate, and the nearest
+neighbour makes the selection-vs-content argument in attention rather than in the MLP. But this was an
+abstract-level check: the per-matrix ablations in 2406.16450 and 2609.15037 could still contain the
+gate/up/down result, and that can only be settled by reading their methods and appendices. The five
+searches at the bottom of `related.md` are still unrun. No BibTeX was written, and no box was ticked.
