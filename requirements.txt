@@ -1,0 +1,8 @@
+# Install PyTorch FIRST with the CUDA build (see SETUP_PC.md), then: pip install -r requirements.txt
+numpy
+transformers>=4.56
+datasets
+huggingface_hub
+accelerate
+matplotlib
+lm-eval
