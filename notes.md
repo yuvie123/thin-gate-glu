@@ -147,3 +147,34 @@ searches at the bottom of `related.md` are still unrun. No BibTeX was written, a
 - Nothing else was lost: the working tree was clean and in sync with the remote.
 - Also decided: the five unrun searches at the bottom of `related.md` get run now, recorded with the
   same discipline as the id check (verified on the paper's own page, no BibTeX, no read box ticked).
+
+### 2026-09-17, evening: the five novelty searches were run
+
+All five queries from the bottom of `related.md` were run as general web searches (they index arXiv well).
+Every hit that went into `related.md` was opened on its own arXiv page and its id, title, authors and
+venue checked there. No BibTeX was written and no read box was ticked.
+
+**Result: no paper found that factorizes only the gate.** Novelty is still not contradicted and still not
+established. But two findings narrow what the paper may claim, and both need reading before Sep 25:
+
+- **LASER, arXiv 2606.00573** (May 2026): its FFN scheme factorizes the gate AND up projections together on
+  the same selected channels and leaves the down projection dense. That is an asymmetric FFN treatment
+  already in print, split input-side vs output-side rather than gate vs content. The sentence in our
+  abstract that existing methods "allocate them identical capacity" is therefore too strong as it stands.
+  The abstract is editable until Sep 25, so this does not block Saturday's registration, but it must be
+  fixed. `paper/main.tex` was not touched today.
+- **FLRC, arXiv 2510.09332** (EMNLP 2025), Appendix A Figure 2: importance scores per projection type in
+  Llama-3-8B, with `down_proj` named as the sensitive one. **WeLore, arXiv 2407.11239** (ICML 2025) says
+  components differ in how low-rank they become. So per-projection sensitivity is not new in itself. If
+  those figures already show gate below up, Exp. A is a confirmation at equal rank, not a discovery, and
+  the paper must say so. Whichever way they point, they get cited next to Exp. A.
+
+Also recorded: Masked GLU (2506.23225, gate and value share one matrix), NA-LoRA (2606.31717, adapters on
+the gate), Spectron (2602.12429, ICML 2026, uniform low-rank pretraining and its instability). The five
+"find the id" placeholders are resolved and verified: CoLA 2502.10940, ASVD 2312.05821, SVD-LLM 2403.07378
+(ICLR 2025), Deja Vu 2310.17157 (ICML 2023), GLU variants 2002.05202.
+
+Not covered, and said so in `related.md`: OpenReview's own search over ICLR 2026 submissions (its browser
+check blocks automated reading, and one relevant-looking submission, `QSoc7HGc6Q`, could not be verified for
+that reason) and Google Scholar "cited by". A Semantic Scholar citation lookup returned 4 citing papers for
+2406.16450, which is implausibly few, so it is treated as incomplete rather than as evidence of absence.

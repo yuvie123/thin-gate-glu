@@ -37,23 +37,45 @@ per-matrix ablation question below can only be answered from the methods and app
 
 **Novelty status after id verification (not after reading):** none of these four factorizes only the gate.
 The closest, 2603.04427, makes the same selection-vs-content argument but in attention. This does not
-establish novelty -- the per-matrix ablations in 2406.16450 and 2609.15037 could still contain the result,
-and the searches at the bottom of this file are still unrun.
+establish novelty -- the per-matrix ablations in 2406.16450 and 2609.15037 could still contain the result.
+
+**Update after the five searches (2026-09-17, evening): still no paper that factorizes only the gate, and
+the claim now needs narrowing.** Two findings change what we may say. (1) LASER (2606.00573) already treats
+the FFN asymmetrically: gate and up low-rank together, down dense. So "existing methods allocate the three
+projections identical capacity" is too strong as written in the abstract and introduction; the accurate
+version is that nobody separates the GATE from the two content projections. (2) FLRC (2510.09332) and
+WeLore (2407.11239) publish per-projection importance or rank profiles, so per-matrix sensitivity is not
+new in itself; what would be new is the controlled equal-rank comparison, the selection-vs-content
+reading of it, and the from-scratch architecture. None of this is settled until those figures are read.
 
 ## Low-rank pretraining (others)
 - [ ] arXiv 2508.02668: LOST (low-rank + sparse pretraining)
 - [ ] arXiv 2603.06492: NOBLE (nonlinear low-rank branches)
-- [ ] CoLA (bottleneck low-rank with nonlinearity): find the arXiv id
+- [ ] **arXiv 2502.10940** `[id verified]` -- "CoLA: Compute-Efficient Pre-Training of LLMs via Low-Rank
+  Activation", Liu, Zhang, Wang, Yan, Yang, Hovland, Nicolae, Cappello, Tang, Zhang (Feb 2025). The page
+  says only "camera-ready"; **find the venue on the page before citing.** Replaces full-size MLPs and
+  attention projections with low-rank auto-encoders; the abstract does not separate gate/up/down.
+- [ ] **arXiv 2602.12429** `[id verified]` -- "Stabilizing Native Low-Rank LLM Pretraining" (Spectron),
+  Janson, Oyallon, Belilovsky. **ICML 2026.** Low-rank factors for ALL non-embedding matrices, with a
+  spectral renormalization against loss spikes. Uniform, no per-matrix split in the abstract. *Relevant to
+  Exp. B twice over: as the uniform baseline, and because it says low-rank pretraining can be unstable.*
 
 ## Post-hoc SVD compression (Experiment A baselines; look in their appendices for gate/up/down sensitivity)
-- [ ] ASVD, SVD-LLM (activation-aware / whitened SVD): find the ids; we use the whitening trick
+- [ ] **arXiv 2312.05821** `[id verified]` -- "ASVD: Activation-aware Singular Value Decomposition for
+  Compressing Large Language Models", Yuan, Shang, Song, Yang, Wu, Yan, Sun (Dec 2023; no venue on the page).
+- [ ] **arXiv 2403.07378** `[id verified]` -- "SVD-LLM: Truncation-aware Singular Value Decomposition for
+  Large Language Model Compression", Wang, Zheng, Wan, Zhang. **ICLR 2025.** Source of the truncation-aware
+  whitening that `posthoc_truncate.py --whiten` follows; *confirm our Cholesky construction matches theirs.*
 - [ ] arXiv 2602.02848: Zero Sum SVD
 - [ ] arXiv 2606.07098: SigmaScale
 - [ ] arXiv 2510.05544: activation-informed Pareto-guided low-rank compression
 
 ## Motivation for "selection is cheap"
-- [ ] Contextual sparsity with low-rank predictors of active MLP neurons (Deja Vu and follow-ups): find the ids
-- [ ] GLU variants paper (origin of SwiGLU): find the id
+- [ ] **arXiv 2310.17157** `[id verified]` -- "Deja Vu: Contextual Sparsity for Efficient LLMs at Inference
+  Time", Liu, Wang, Dao, Zhou, Yuan, Song, Shrivastava, Zhang, Tian, Re, Chen. **ICML 2023.** Low-cost
+  predictors of which MLP neurons and attention heads are active. Follow-ups: still to find.
+- [ ] **arXiv 2002.05202** `[id verified]` -- "GLU Variants Improve Transformer", Shazeer (Feb 2020; arXiv
+  only, no venue on the page).
 
 ## Found by the searches of 2026-09-17 (ids verified on the arXiv page; NONE read yet)
 
@@ -82,16 +104,42 @@ treat it as a pointer to where to read, not as a finding you can cite.
   gate. A different answer to the same question ("does the gate deserve a full matrix of its own?"), so
   it belongs in Related Work and possibly as a baseline to discuss.
 
-**SVD-compression papers surfaced by the same searches (ids NOT yet verified; check appendices for
-per-projection results):** arXiv 2605.15626 (IO-SVD), arXiv 2602.03051 (SAES-SVD), arXiv 2601.07839
-(hierarchical sparse plus low-rank), arXiv 2505.21732 (LaX, low-rank training).
+**Further neighbours (second batch of searches):**
+- [ ] **arXiv 2407.11239** `[id verified]` -- "From Low Rank Gradient Subspace Stabilization to Low-Rank
+  Weights: Observations, Theories, and Applications" (WeLore), Jaiswal, Wang, Yin, Liu, Chen, Zhao, Grama,
+  Tian, Wang. **ICML 2025.** Abstract: "different LLM components exhibit varying levels of converged
+  low-rank structures, necessitating variable rank reduction across them". It does not name the gate.
+  *Check its per-matrix figures: do gate_proj, up_proj and down_proj come out differently?*
+- [ ] **arXiv 2606.31717** `[id verified]` -- "Nonlinearity-Aware LoRA: Structured Gate Adaptation under
+  Low-Rank Constraints", Yuan, Cai, Chen, Zheng, Xiao, Onizuka, Mao (30 Jun 2026; page says under review).
+  Fine-tuning ADAPTERS on the gate of gated FFNs, not a low-rank replacement of the gate itself. Relevant
+  because it argues a low-rank update to the gate changes the nonlinear selection, not just the features.
+- [ ] OpenReview `QSoc7HGc6Q` **[NOT verified: OpenReview's browser check blocks automated reading]** --
+  search results titled it "Low Rank Experts Enable Specialization in Dense ..." and quoted it as attaching
+  its low-rank experts ONLY to the up-projection because the down-projection gave a weaker trade-off. An
+  asymmetric choice among FFN matrices, so open it in a browser and check title, status and that claim.
+
+**Surfaced by the same searches, ids NOT yet verified (check appendices for per-projection results):**
+arXiv 2605.15626 (IO-SVD), arXiv 2602.03051 (SAES-SVD), arXiv 2601.07839 (hierarchical sparse plus
+low-rank), arXiv 2505.21732 (LaX, low-rank training), arXiv 2406.02214 (SLTrain), arXiv 2505.12781
+(Low-Rank Clone; its ablation drops FFN gate / up / down loss terms separately), arXiv 2505.17936
+(gated neurons and their input-output functionality), arXiv 2606.22172 (gated MLPs as rank-1 bilinear
+attention).
 
 ## Searches still to run (arXiv, Semantic Scholar, OpenReview incl. ICLR 2026 submissions, Google Scholar "cited by" on 2406.16450)
 - [ran 2026-09-17, web search over arXiv] "low-rank gate" GLU / SwiGLU -- no gate-only paper found
 - [ran 2026-09-17, web search over arXiv] "factorized gate" feed-forward -- no gate-only paper found
 - [ran 2026-09-17, web search] "asymmetric GLU" / "narrow gate" / "thin gate" -- nothing relevant at all
-- "gate projection" rank / compressibility / sensitivity
-- "which FFN matrix" low-rank ablation
+- [ran 2026-09-17, web search over arXiv] "gate projection" rank / compressibility / sensitivity -- found FLRC,
+  WeLore and LASER above; no gate-only paper
+- [ran 2026-09-17, web search over arXiv] "which FFN matrix" low-rank ablation -- found MoARa (already listed),
+  Low-Rank Clone and the low-rank-experts submission above; no gate-only paper
+
+**Coverage, stated honestly.** These were general web searches, which index arXiv well and OpenReview badly.
+Still NOT done, and only doable in a browser: (1) OpenReview's own search over ICLR 2026 submissions, which
+blocks automated reading; (2) Google Scholar "cited by" on 2406.16450. A Semantic Scholar citation lookup
+returned only 4 citing papers for 2406.16450 and 2 for 2603.04427, none about GLU gates or FFN structure; 4 is
+implausibly few for a NeurIPS 2024 paper, so treat that list as incomplete, not as a clean bill.
 
 If you find a paper that factorizes only the gate: tell me immediately. We then either pivot the
 framing (asymmetry study + conversion) or drop the novelty claim; do not ignore it.
