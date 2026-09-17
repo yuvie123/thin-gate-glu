@@ -344,3 +344,21 @@ Looked inside the full texts of the must-read papers instead of only their abstr
   found; say so in the limitations rather than shrinking seeds to squeeze M in.
 - Risk carried: the float16 training path has never run on a real GPU. Its first test is the smoke run in
   the notebook's check step, and its second is the 20M-token speed check, both in session 1 and both cheap.
+
+### 2026-09-17, evening: where else this paper could go (deadlines checked on the venues' own pages today)
+
+One archival venue at a time: a paper under review at ICLR cannot also be under review elsewhere. A paper
+withdrawn from ICLR before its Sep 25 paper deadline is deleted, which frees it for any of these.
+
+| Venue | Open now? | Deadline (checked 2026-09-17) | Fit |
+|---|---|---|---|
+| ICLR 2027 | yes | abstract Sep 18 AOE, paper Sep 25 AOE | current target; 8 days is very tight |
+| AISTATS 2027 | yes | abstract Tue Sep 29, paper Tue Oct 6, 2026; 8 pages; double-blind | in scope ("Deep learning (theory, architectures, ...)") |
+| ARR October 2026 cycle | yes | Oct 12, 2026; feeds NAACL 2027 and COLING 2027 (commit Dec 23) | good; needs complete OpenReview profile incl. ORCID; check reviewer rules for a sole first-time author |
+| TMLR | always (rolling) | none | best fit after the WeLore finding: judged on correctness of claims, not novelty |
+| CPAL 2027 (Tokyo, Mar 23-26) | yes | abstract Nov 23, paper Dec 5, 2026; spotlight track Jan 18, 2027 | best topical fit: the conference is about low-rank and sparse structure |
+| NeurIPS 2026 workshops | effectively closed | most closed Aug 29 to Sep 11; the few still open are off-topic | none |
+
+Not announced yet on their own sites: ICML 2027 (an aggregator says Jan 22, 2027; unofficial), ACL 2027 via the
+ARR January cycle, COLM 2027, MLSys 2027, ICLR 2027 workshops. arXiv is open any time but a first submission
+to cs.LG needs an endorser.
