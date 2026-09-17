@@ -1,5 +1,14 @@
 # Setting up the GPU machine (Ryzen 7 + RTX 3070, Windows)
 
+**Shortcut:** after step 1 (WSL2) below, everything else is automated:
+```bash
+sudo apt update && sudo apt install -y gh git
+gh auth login                                   # GitHub.com -> HTTPS -> login with a web browser
+gh repo clone yuvie123/thin-gate-glu ~/thin-gate
+bash ~/thin-gate/setup_pc.sh
+```
+The remaining sections explain what that script does and how to fix problems.
+
 Do this once, on Day 0. Budget about an hour. Everything heavy runs here; the MacBook only edits and writes.
 
 ## 1. WSL2 + Ubuntu (Linux inside Windows)
