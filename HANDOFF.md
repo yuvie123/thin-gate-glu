@@ -20,7 +20,10 @@ Read `README.md` (commands, go/no-go criteria, honesty rules) and `PLAN.md` (ide
   plan. Nothing GPU-related is needed for the abstract. If it goes ahead: `wsl --install -d Ubuntu-24.04` in an elevated PowerShell,
   reboot, create the Linux user. Until `setup_pc.sh` has run inside Ubuntu, Exp. A on GPU, Exp. B,
   Exp. C and `bench.py` are all blocked. Windows sleep on AC is now set to never.
-- **No experiment result exists yet.** A CPU fallback sweep of Exp. A (SmolLM2-135M, fp32) was started
+- **First evidence (probe only, not for the paper):** on SmolLM2-135M, 8 windows, the gate tolerated
+  truncation best in 5 of 6 settings and beat the up-projection in all 6; gate vs down crosses over at
+  the lowest rank under whitening. Table in `notes.md`. Encouraging, one model, proves nothing yet.
+- **No paper-grade experiment result exists yet.** A CPU fallback sweep of Exp. A (SmolLM2-135M, fp32) was started
   and lost after 2 of 18 configs when the session that owned it was closed; it was deliberately not
   relaunched. What it did establish: the evaluation is sound (full-split baseline perplexity **17.463**,
   plausible tens), and two real bugs are fixed (`Salesforce/wikitext` dataset id under datasets>=4;

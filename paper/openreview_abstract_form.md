@@ -19,18 +19,18 @@ added before the deadline and need their own OpenReview profile. If you are the 
 
 ## Keywords *
 ```
-gated linear units, SwiGLU, low-rank factorization, feed-forward layers, Transformer language models, parameter efficiency, singular value decomposition, model compression
+gated linear units, SwiGLU, feed-forward layers, low-rank factorization, efficient Transformers, language models, parameter efficiency, singular value decomposition, model compression
 ```
 
 ## TL;DR (optional, but fill it in)
 ```
-We ask whether the gate of a GLU feed-forward block needs less rank than its up- and down-projections, by compressing each one to the same rank and comparing the damage.
+GLU feed-forward blocks give their gate, up- and down-projections equal size; using equal-rank controls, we test whether the gate, which only selects, can be much lower rank than the projections that carry content.
 ```
 
 ## Abstract *
 Paste as one paragraph. It contains no TeX and no numbers. It matches `paper/main.tex` word for word.
 ```
-Gated linear units (GLUs) are the standard feed-forward block in modern Transformers and spend three equally sized projections per block: a gate, an up-projection, and a down-projection. These play different roles: the gate selects which hidden units are active, while the up- and down-projections carry the content written back to the residual stream. Standard architectures nevertheless give all three the same capacity. We ask whether selection is cheaper than content. First, in a training-free study of open pretrained language models, we compare truncating each projection to the same rank at matched parameter savings, using both plain and activation-aware singular value decompositions. Second, we study the thin-gate GLU, which factorizes only the gate through a low-rank bottleneck and leaves the content path dense, and evaluate it against dense, width-reduced, and uniformly low-rank baselines, as well as the symmetric controls that factorize only the up- or only the down-projection, in small-scale language-model pretraining with multiple seeds. Third, we test whether pretrained models can be converted by truncating one projection and training only the new factors. We report measured throughput and memory alongside parameter and FLOP counts, and discuss the limited scale of our experiments.
+Gated linear units (GLUs) are the standard feed-forward block of modern Transformer language models and hold most of each block's parameters in three equally sized projections: a gate, an up-projection, and a down-projection. These are commonly described as doing different jobs: the gate selects which hidden units are active, while the up- and down-projections carry the content written back to the residual stream. Standard architectures nevertheless give all three the same capacity. We ask whether selection is cheaper than content. Because the three matrices share a shape, the question admits a controlled test: restrict one projection at a time to the same rank, so that parameter savings are identical, and measure which restriction the model tolerates best. First, in open pretrained language models and without any training, we truncate each projection with plain and activation-aware singular value decompositions and compare perplexity. Second, in small-scale pretraining from scratch with multiple seeds, we compare the thin-gate GLU, which factorizes only the gate and keeps the content path dense, against dense, width-reduced, and uniformly low-rank baselines at matched parameter counts, and against the symmetric controls that factorize only the up- or only the down-projection. Third, we test whether pretrained models can be converted by truncating one projection and training only the new factors. We report measured throughput and memory alongside parameter and FLOP counts, and state the scale limits of our experiments.
 ```
 Every sentence from "Second" onwards is a promise about an experiment that needs a GPU. If one of
 them does not happen, delete its sentence before Sep 25. The guidelines allow that ("titles and

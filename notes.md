@@ -197,3 +197,55 @@ that reason) and Google Scholar "cited by". A Semantic Scholar citation lookup r
 - The abstract still promises Exp. B, Exp. C and the throughput benchmark, which need a GPU. Whether and
   how the GPU gets used is undecided (author is reluctant to load it for ~100 h). Nothing GPU-related is
   needed for Saturday. Sentences for experiments that do not happen must be deleted before Sep 25.
+
+### 2026-09-17, about 16:15: first probe that measures all three projections
+
+Until now only `gate_proj` had ever been truncated, so the hypothesis itself (gate vs up vs down) had
+no evidence either way. Ran a throwaway probe to get a first look before polishing the abstract.
+
+Setup: SmolLM2-135M, wikitext-2 test, **only 8 windows of 1024 tokens**, CPU fp32, 4 threads (the PC was
+in use, so the run was throttled), ranks 0.75 / 0.5 / 0.25 of full, whitening calibrated on 8 train
+windows. Output in `results/scratch/probe8/` (gitignored, skipped by `plot.py`). Baseline 20.074,
+identical to the earlier 8-window probe, so the evaluation is deterministic. A first attempt with 16
+windows was killed because it was too slow under load; it produced nothing.
+
+Perplexity as a multiple of the baseline (lower = that projection tolerates the rank cut better):
+
+| rank / full | whitened: gate | up | down | plain: gate | up | down |
+|---|---|---|---|---|---|---|
+| 0.75 | **x1.10** | x1.22 | x1.18 | **x2.37** | x34.8 | x6.27 |
+| 0.50 | **x1.63** | x2.54 | x2.02 | **x81.6** | x1082 | x6628 |
+| 0.25 | x13.3 | x114 | **x9.09** | **x3532** | x480159 | x44172 |
+
+- The gate is the most tolerant projection in 5 of the 6 cells. The exception is whitened SVD at the
+  lowest rank, where down beats it (x9.1 vs x13.3).
+- **Gate beats up in all 6 cells**, by x1.1 at the mildest setting and by more than x100 at the harshest.
+  That is the cleanest comparison available, because gate and up have the same shape AND the same input.
+  It also cuts against treating gate and up as interchangeable, which is what LASER (2606.00573) does.
+- Gate vs down is NOT settled: gate wins at moderate rank, down wins at the extreme. The honest summary
+  is "up is the fragile one; gate is robust; down is in between and crosses over", not "gate << content".
+- Possible mechanism, untested: an error in the gate passes through SiLU, which flattens it on inactive
+  units, while an error in up passes straight through. Worth one paragraph and one experiment later.
+
+**What this is and is not.** It is one 135M model, 8k evaluation tokens, a non-standard calibration size
+and CPU precision. It is a reason to keep going, consistent with the README "go" direction on this one
+model. It is NOT a result: none of these numbers may appear in the paper or the abstract (rule 1), and the
+README criterion needs "most models", which needs either the GPU or a cloud GPU for anything above 360M.
+The abstract stays numbers-free and neutral about the direction.
+
+### 2026-09-17, about 16:20: project review and abstract refinement
+
+- Reviewed `posthoc_truncate.py`, `hf_utils.py`, `model.py`, `train.py`, `data.py`, `heal.py`, `bench.py`,
+  `tests.py`, `grid.py`. No bug found that would invalidate a result. Equal rank really is equal parameter
+  count for all three projections; arms are parameter-matched within 1.5% (tested); data order depends only
+  on the seed. Two things to remember when writing: at rank 0.75 the factorized matrix has MORE parameters
+  than the dense one (ratio 1.03; break-even is rank 0.727), so plots should use the recorded `param_ratio`,
+  and `train.py` times throughput with evaluation pauses included, so `bench.py` is the number to report.
+- Abstract rewritten for the registration (same content, no new claims): adds why the block matters (most
+  of each block's parameters), presents selection-vs-content as the common description under test rather
+  than as fact, and puts the design's strongest point up front: equal shapes make equal rank an
+  equal-savings control. `main.tex` and `paper/openreview_abstract_form.md` verified identical. TL;DR and
+  keywords sharpened. Title unchanged (a question, true under any outcome).
+- Status against the original goal (a small but real contribution): not reached yet. There is a novel,
+  well-controlled question, working code, and one encouraging probe. There is no paper-grade result, no
+  read literature, no BibTeX, and the GPU question is open.
