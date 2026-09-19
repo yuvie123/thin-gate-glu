@@ -36,7 +36,9 @@ plt.rcParams.update({
 
 
 # ---------------------------------------------------------------- Experiment A
-def plot_posthoc(results, method, out_dir):
+def plot_posthoc(results, method, out_dir, xkey="rank_frac"):
+    """xkey: "rank_frac" (rank / full rank, same for every model) or "param_ratio" (parameters of the
+    factorized projection / dense, which differs between model families because d_ff/d differs)."""
     results = [r for r in results if r["method"] == method]
     if not results:
         return
@@ -47,7 +49,7 @@ def plot_posthoc(results, method, out_dir):
     fig, axes = plt.subplots(rows, cols, figsize=(1.75 * cols + 0.4, 1.6 * rows + 0.5), squeeze=False, sharex=True)
     for ax, res in zip(axes.flat, results):
         for ptype, (color, marker, ls, label) in STYLE.items():
-            pts = sorted((r["rank_frac"], r["ppl"] / res["base_ppl"]) for r in res["records"] if r["type"] == ptype)
+            pts = sorted((r[xkey], r["ppl"] / res["base_ppl"]) for r in res["records"] if r["type"] == ptype)
             if not pts:
                 continue
             xs, ys = zip(*pts)
@@ -56,24 +58,32 @@ def plot_posthoc(results, method, out_dir):
         ax.set_yscale("log")
         ax.grid(True, which="major", axis="y")
         ax.set_title(f"{res['model'].split('/')[-1]}", color=INK)
-        ax.set_xticks([1 / 16, 1 / 8, 1 / 4, 1 / 2])
-        ax.set_xticklabels(["1/16", "1/8", "1/4", "1/2"])
+        if xkey == "rank_frac":
+            ax.set_xticks([1 / 16, 1 / 8, 1 / 4, 1 / 2])
+            ax.set_xticklabels(["1/16", "1/8", "1/4", "1/2"])
+        else:
+            ax.set_xticks([1 / 8, 1 / 4, 1 / 2, 1])
+            ax.set_xticklabels(["1/8", "1/4", "1/2", "1"])
+            ax.axvline(1.0, color=NEUTRAL, lw=0.6, ls="-")      # dense parameter count
     for ax in axes.flat[n:]:
         ax.axis("off")
     for ax in axes[-1]:
-        ax.set_xlabel("rank / full rank")
+        ax.set_xlabel("rank / full rank" if xkey == "rank_frac" else "projection parameters / dense")
     for ax in axes[:, 0]:
         ax.set_ylabel("perplexity / baseline")
     handles, labels = axes.flat[0].get_legend_handles_labels()
     fig.legend(handles, labels, title="truncated projection", loc="upper center", ncol=3, frameon=False,
                bbox_to_anchor=(0.5, 1.0))
     fig.tight_layout(rect=(0, 0, 1, 0.9))
-    path = os.path.join(out_dir, "figures", f"posthoc_{method}.pdf")
+    suffix = "" if xkey == "rank_frac" else "_params"
+    path = os.path.join(out_dir, "figures", f"posthoc_{method}{suffix}.pdf")
     fig.savefig(path)
     plt.close(fig)
     print("wrote", path)
 
-    # table: perplexity ratio at each rank
+    if xkey != "rank_frac":
+        return
+    # table: perplexity at each rank
     fracs = sorted({r["rank_frac"] for res in results for r in res["records"]}, reverse=True)
     lines = ["\\begin{tabular}{ll" + "r" * len(fracs) + "}", "\\toprule",
              "Model & Proj. & " + " & ".join(f"$r/d={f:g}$" for f in fracs) + " \\\\", "\\midrule"]
@@ -81,7 +91,8 @@ def plot_posthoc(results, method, out_dir):
         for ptype in STYLE:
             vals = {r["rank_frac"]: r["ppl"] for r in res["records"] if r["type"] == ptype}
             cells = " & ".join(f"{vals[f]:.1f}" if f in vals else "--" for f in fracs)
-            first = f"{res['model'].split('/')[-1]} ({res['base_ppl']:.1f})" if ptype == "gate_proj" else ""
+            short = res["model"].split("/")[-1].replace("_", "\\_")      # LaTeX: "_" is a subscript
+            first = f"{short} ({res['base_ppl']:.1f})" if ptype == "gate_proj" else ""
             lines.append(f"{first} & {STYLE[ptype][3]} & {cells} \\\\")
         lines.append("\\midrule")
     lines[-1] = "\\bottomrule"
@@ -192,5 +203,6 @@ if __name__ == "__main__":
     print(f"found {len(posthoc)} post-hoc, {len(training)} training, {len(heal)} healing result files")
     for method in ("plain", "whiten"):
         plot_posthoc(posthoc, method, args.out_dir)
+        plot_posthoc(posthoc, method, args.out_dir, xkey="param_ratio")
     plot_training(training, args.out_dir)
     table_heal(heal, args.out_dir)

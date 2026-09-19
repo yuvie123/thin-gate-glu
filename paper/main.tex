@@ -116,19 +116,79 @@ Cholesky factor $\mS\mS^\top = \mX\mX^\top$ we truncate the SVD of $\mW\mS$ and 
 
 \section{Experiments}
 \subsection{Setup}
-\todo{Models, data (FineWeb GPT-2 tokens; wikitext-2 test for perplexity), token budgets, optimizer, learning
-rate and how it was chosen (same sweep for every arm), seeds, hardware: every experiment ran on NVIDIA T4
-GPUs (16\,GB) on a public cloud notebook service; post-hoc truncation in float32, pretraining and conversion
-in float16 with loss scaling, because the T4 has no native bfloat16. Full hyperparameters go in the appendix.}
+\label{sec:setup}
+
+\paragraph{Training-free truncation (Exp.~A).} We use seven open pretrained GLU language models spanning
+135M to 1.7B parameters: SmolLM2-135M, -360M and -1.7B, Qwen2.5-0.5B and -1.5B, TinyLlama v1.1 (1.1B) and
+OLMo-2-1B. % CITE each model's release paper or model card after reading it.
+For each model and each projection type (gate, up, down) we replace that projection in every layer by its
+rank-$r$ approximation, for $r/d \in \{3/4, 1/2, 3/8, 1/4, 1/8, 1/16\}$ where $d$ is the model width, and
+measure perplexity on the full WikiText-2 test split in non-overlapping windows of 1024 tokens.
+Activation-aware truncation is calibrated on 32 windows of the WikiText-2 training split. All Exp.~A runs
+are in float32 on NVIDIA T4 GPUs. Because the three projections of a block have the same shape, a given
+rank $r$ removes the same number of parameters whichever projection it is applied to; the parameter count
+of the factorized projection relative to the dense one is $r(d + d_{\mathrm{ff}}) / (d\, d_{\mathrm{ff}})$
+and is reported alongside $r/d$ (Figure~\ref{fig:posthoc_params}).
+
+\paragraph{Pretraining from scratch (Exp.~B) and conversion (Exp.~C).}
+\todo{Models (sizes S and M from \texttt{grid.py --table}), data (FineWeb GPT-2 tokens; wikitext-2 test for
+perplexity), token budgets, optimizer, learning rate and how it was chosen (same sweep for every arm),
+seeds. Hardware: NVIDIA T4 GPUs (16\,GB) on a public cloud notebook service, float16 with loss scaling
+because the T4 has no native bfloat16. Full hyperparameters go in the appendix.}
 
 \subsection{Which projection tolerates rank reduction in pretrained models?}
-\todo{Figure~\ref{fig:posthoc}; tables/posthoc\_plain.tex and tables/posthoc\_whiten.tex.}
-\begin{figure}[h]
+\label{sec:exp_a}
+
+Figure~\ref{fig:posthoc} shows perplexity relative to the untruncated model when one projection type is
+truncated to rank $r$ in every layer, using activation-aware truncation; Table~\ref{tab:posthoc_whiten}
+lists the same numbers, and the appendix repeats both for plain SVD.
+% DRAFT WRITTEN FROM results/posthoc (2026-09-19 session). Every claim below must be re-checked against
+% the final figure and table before submission; no number is typed here on purpose.
+Three regularities hold across the seven models. First, the up-projection is the most fragile of the three:
+in all but one model-rank setting, truncating the up-projection costs more perplexity than truncating the
+gate to the same rank, usually far more, and in the one exception the two are within a fraction of a
+percent of each other. \todo{verify the exception against the final table: SmolLM2-360M at $r/d=1/4$.}
+Second, at $r/d = 3/4$ the gate is the projection every model tolerates best, and at $r/d = 1/2$ this holds
+for all but one model, where gate and down-projection are within a few percent. \todo{verify: Qwen2.5-0.5B.}
+Third, the ranking of gate and down-projection depends on the rank: at aggressive ranks ($r/d \le 1/4$)
+the down-projection overtakes the gate in most models. The ordering is therefore not ``selection is cheaper
+than content'' across the board, but ``the gate is cheaper than the up-projection throughout, and cheaper
+than the down-projection at moderate rank.''
+\todo{After reading WeLore, relate this to their Hessian-gap observation on LLaMA-2-7B and say what is new
+here: one projection at a time, equal rank, whitened, seven models, and the crossover.}
+Plain SVD (appendix) gives the same qualitative ordering at moderate rank but is destructive for every
+projection below $r/d = 3/4$, which is why the activation-aware variant is the one we build on.
+
+\begin{figure}[t]
   \centering
-  % \includegraphics[width=\linewidth]{figures/posthoc_whiten.pdf}
-  \caption{\todo{caption: what is plotted, how to read it, the one-sentence takeaway}}
+  \includegraphics[width=\linewidth]{figures/posthoc_whiten.pdf}
+  \caption{Training-free truncation of one projection type at a time, activation-aware SVD. Each panel is
+  one pretrained model; the $x$-axis is the retained rank as a fraction of the model width $d$ (log scale)
+  and the $y$-axis is WikiText-2 perplexity divided by the untruncated model's perplexity (log scale).
+  Lower is better. The gate (blue) lies below the up-projection (orange) at almost every rank; the
+  down-projection (green) overtakes the gate at the most aggressive ranks in most models.}
   \label{fig:posthoc}
 \end{figure}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{figures/posthoc_whiten_params.pdf}
+  \caption{The same data as Figure~\ref{fig:posthoc} with the $x$-axis replaced by the parameter count of
+  the factorized projection relative to the dense projection. The vertical line marks the dense count;
+  points to its right ($r/d = 3/4$ in models with $d_{\mathrm{ff}}/d = 8/3$) have \emph{more} parameters
+  than the dense projection. \todo{keep only one of the two figures in the main text; move the other to
+  the appendix.}}
+  \label{fig:posthoc_params}
+\end{figure}
+
+\begin{table}[t]
+  \centering
+  \small
+  \caption{WikiText-2 perplexity after activation-aware truncation of one projection type to rank $r$ in
+  every layer. The baseline perplexity of each model is given in parentheses. Generated by \texttt{plot.py}.}
+  \label{tab:posthoc_whiten}
+  \input{tables/posthoc_whiten.tex}
+\end{table}
 
 \subsection{Pretraining from scratch}
 \todo{Figure with figures/training.pdf and tables/training.tex. Report mean $\pm$ std over seeds and compare

@@ -63,8 +63,13 @@ run log and the place where every decision is recorded.
   says T4. The paper still uses the **ICLR 2027 style file as a placeholder** because CPAL's template is not
   published; check cpal.cc/openreview/ and swap when it is (same 9-page limit). 12 `\todo`s remain.
   **`references.bib` is still empty and no paper in `related.md` has been read yet.**
-- Open plotting decision: `posthoc_*.pdf` uses rank / full rank on the x-axis; the same rank fraction is a
-  different parameter saving across model families (`param_ratio` is recorded). Decide before Results.
+- Open plotting decision: `plot.py` now writes both `posthoc_{whiten,plain}.pdf` (x = rank / full rank) and
+  `posthoc_{whiten,plain}_params.pdf` (x = parameters of the factorized projection / dense, which differs
+  between model families). Both are included in `main.tex` with a `\todo` to keep one in the main text.
+- 2026-09-19: Setup (Exp. A part) and the Exp. A results subsection are drafted in `main.tex`, wired to the
+  generated figure and `tables/posthoc_whiten.tex`; no number typed by hand. Two `\todo`s mark the cells
+  to re-verify (the single gate-vs-up tie, the single gate-vs-down near-tie at r/d = 1/2). The paper
+  compiles with `tectonic` on the Mac (empty bibliography, expected).
 
 ### Next, in order
 1. **Session 2:** `python make_cloud_notebook.py --run pilot` (6 runs, about 4 h on two T4s). Upload, run,
