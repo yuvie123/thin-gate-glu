@@ -1,0 +1,141 @@
+{
+ "model": "Qwen/Qwen2.5-1.5B",
+ "dataset": "wikitext2",
+ "seq_len": 1024,
+ "method": "whiten",
+ "d_model": 1536,
+ "d_ff": 8960,
+ "n_layers": 28,
+ "n_params": 1543714304,
+ "base_ppl": 10.402600288391113,
+ "records": [
+  {
+   "type": "gate_proj",
+   "rank_frac": 0.75,
+   "rank": 1152,
+   "ppl": 11.216533660888672,
+   "param_ratio": 0.8785714285714286
+  },
+  {
+   "type": "gate_proj",
+   "rank_frac": 0.5,
+   "rank": 768,
+   "ppl": 16.066238403320312,
+   "param_ratio": 0.5857142857142857
+  },
+  {
+   "type": "gate_proj",
+   "rank_frac": 0.375,
+   "rank": 576,
+   "ppl": 26.901227951049805,
+   "param_ratio": 0.4392857142857143
+  },
+  {
+   "type": "gate_proj",
+   "rank_frac": 0.25,
+   "rank": 384,
+   "ppl": 99.53427124023438,
+   "param_ratio": 0.29285714285714287
+  },
+  {
+   "type": "gate_proj",
+   "rank_frac": 0.125,
+   "rank": 192,
+   "ppl": 700.0216064453125,
+   "param_ratio": 0.14642857142857144
+  },
+  {
+   "type": "gate_proj",
+   "rank_frac": 0.0625,
+   "rank": 96,
+   "ppl": 3547.23095703125,
+   "param_ratio": 0.07321428571428572
+  },
+  {
+   "type": "up_proj",
+   "rank_frac": 0.75,
+   "rank": 1152,
+   "ppl": 12.370553016662598,
+   "param_ratio": 0.8785714285714286
+  },
+  {
+   "type": "up_proj",
+   "rank_frac": 0.5,
+   "rank": 768,
+   "ppl": 20.732385635375977,
+   "param_ratio": 0.5857142857142857
+  },
+  {
+   "type": "up_proj",
+   "rank_frac": 0.375,
+   "rank": 576,
+   "ppl": 37.18949890136719,
+   "param_ratio": 0.4392857142857143
+  },
+  {
+   "type": "up_proj",
+   "rank_frac": 0.25,
+   "rank": 384,
+   "ppl": 114.80221557617188,
+   "param_ratio": 0.29285714285714287
+  },
+  {
+   "type": "up_proj",
+   "rank_frac": 0.125,
+   "rank": 192,
+   "ppl": 1812.7169189453125,
+   "param_ratio": 0.14642857142857144
+  },
+  {
+   "type": "up_proj",
+   "rank_frac": 0.0625,
+   "rank": 96,
+   "ppl": 19130.283203125,
+   "param_ratio": 0.07321428571428572
+  },
+  {
+   "type": "down_proj",
+   "rank_frac": 0.75,
+   "rank": 1152,
+   "ppl": 12.000251770019531,
+   "param_ratio": 0.8785714285714286
+  },
+  {
+   "type": "down_proj",
+   "rank_frac": 0.5,
+   "rank": 768,
+   "ppl": 17.82045555114746,
+   "param_ratio": 0.5857142857142857
+  },
+  {
+   "type": "down_proj",
+   "rank_frac": 0.375,
+   "rank": 576,
+   "ppl": 26.838050842285156,
+   "param_ratio": 0.4392857142857143
+  },
+  {
+   "type": "down_proj",
+   "rank_frac": 0.25,
+   "rank": 384,
+   "ppl": 56.35809326171875,
+   "param_ratio": 0.29285714285714287
+  },
+  {
+   "type": "down_proj",
+   "rank_frac": 0.125,
+   "rank": 192,
+   "ppl": 217.80377197265625,
+   "param_ratio": 0.14642857142857144
+  },
+  {
+   "type": "down_proj",
+   "rank_frac": 0.0625,
+   "rank": 96,
+   "ppl": 750.2407836914062,
+   "param_ratio": 0.07321428571428572
+  }
+ ],
+ "device": "Tesla T4",
+ "dtype": "float32"
+}
