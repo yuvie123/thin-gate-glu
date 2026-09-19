@@ -153,13 +153,13 @@ percent of each other. \todo{verify the exception against the final table: SmolL
 Second, at $r/d = 3/4$ the gate is the projection every model tolerates best, and at $r/d = 1/2$ this holds
 for all but one model, where gate and down-projection are within a few percent. \todo{verify: Qwen2.5-0.5B.}
 Third, the ranking of gate and down-projection depends on the rank: at aggressive ranks ($r/d \le 1/4$)
-the down-projection overtakes the gate in most models. The ordering is therefore not ``selection is cheaper
-than content'' across the board, but ``the gate is cheaper than the up-projection throughout, and cheaper
-than the down-projection at moderate rank.''
+the down-projection overtakes the gate in most models. The hypothesis that selection is cheaper than
+content therefore holds only in part: the gate is cheaper than the up-projection throughout, and cheaper
+than the down-projection at moderate rank.
 \todo{After reading WeLore, relate this to their Hessian-gap observation on LLaMA-2-7B and say what is new
 here: one projection at a time, equal rank, whitened, seven models, and the crossover.}
-Plain SVD (appendix) gives the same qualitative ordering at moderate rank but is destructive for every
-projection below $r/d = 3/4$, which is why the activation-aware variant is the one we build on.
+Plain SVD (appendix) gives the same qualitative ordering at moderate rank but destroys every projection
+below $r/d = 3/4$, so the activation-aware variant is the one we build on.
 
 \begin{figure}[t]
   \centering
@@ -218,9 +218,9 @@ interpret results. We have not used generative AI tools to generate synthetic da
 theoretical models or conceptual frameworks, to formulate mathematical claims, to provide critical
 ingredients for proving mathematical claims or to assist in the writing of proofs, to assist with
 translation, or to support qualitative or thematic data analysis.
-Additionally, we used generative AI tools for brainstorming, searching for and identifying related
-literature, suggesting experimental parameters, creating software code and figures, drafting and editing
-parts of this paper, and proposing the title.
+We also used generative AI tools for brainstorming, searching for and identifying related literature,
+suggesting experimental parameters, creating software code and figures, drafting and editing parts of
+this paper, and proposing the title.
 % VERIFY BEFORE SUBMISSION. Every clause of the next sentence must be true on the day you submit:
 %   (1) tests.py passes on the machine that produced the reported numbers;
 %   (2) every number in the paper came from a results/*.json through plot.py, none typed by hand;
@@ -231,7 +231,7 @@ parts of this paper, and proposing the title.
 We have reviewed all AI-assisted work: the correctness tests accompanying our code were run and pass
 (exact reconstruction of a dense layer at full rank, parameter and FLOP counts checked against hand
 calculations, and a causality check on the model); every number reported in this paper is generated
-programmatically from logged result files rather than transcribed; the AI-written code was read and
+programmatically from logged result files; the AI-written code was read and
 checked by the authors; every cited work was read by the authors before being cited; and AI-suggested
 ideas were checked for prior work through a manual literature search. We take responsibility for the
 final content of this work, including text, claims or artifacts produced with the aid of generative AI.
@@ -247,12 +247,11 @@ their energy cost low but also bounds the conclusions we can draw, as we set out
 
 \subsection*{Reproducibility statement}
 All architectural details of the thin-gate GLU and of the control arms are given in
-Section~\ref{sec:method}, and every hyperparameter -- model sizes, token budgets, optimizer settings,
-learning-rate schedule, batch size and random seeds -- is listed in the appendix. The anonymized source code
+Section~\ref{sec:method}, and every hyperparameter (model sizes, token budgets, optimizer settings,
+learning-rate schedule, batch size and random seeds) is listed in the appendix. The anonymized source code
 is included as supplementary material and contains the pretraining, post-hoc truncation, conversion,
-benchmarking and plotting scripts together with the correctness tests. Every figure and table in this paper
-is generated from logged JSON result files by a single plotting script, so no reported number is transcribed
-by hand. All pretrained models and evaluation datasets are publicly available and are identified by their
+benchmarking and plotting scripts together with the correctness tests. A single plotting script generates every
+figure and table in this paper from logged JSON result files, so no reported number is typed in by hand. All pretrained models and evaluation datasets are publicly available and are identified by their
 exact repository names and configurations in the appendix.
 
 \bibliography{references}
