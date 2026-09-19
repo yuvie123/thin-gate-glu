@@ -1,8 +1,8 @@
 # Thin-gate GLU: do GLU gates need full rank?
 
-This repo holds the code and paper for an ICLR 2027 submission. The abstract is due Sep 18 AOE (Sat Sep 19, 07:59 EDT) and the paper is due Sep 25 AOE (Sat Sep 26, 07:59 EDT).
+This repo holds the code and paper for a submission to CPAL 2027 (Conference on Parsimony and Learning, Proceedings Track). Abstract registration is due Nov 23, 2026 and the paper Dec 5, 2026. An earlier ICLR 2027 target was dropped when its abstract deadline passed unregistered.
 
-[PLAN.md](PLAN.md) has the full plan: the ideas considered, the abstract, title options, the schedule and the go/no-go checkpoint. [SETUP_PC.md](SETUP_PC.md) covers setting up the GPU machine, and [related.md](related.md) is the reading list.
+[PLAN.md](PLAN.md) has the original plan: the ideas considered, the abstract, title options and the go/no-go criteria (its 8-day schedule is history; the current schedule is in [HANDOFF.md](HANDOFF.md)). [SETUP_PC.md](SETUP_PC.md) covers setting up the GPU machine, and [related.md](related.md) is the reading list.
 
 ## Hypothesis
 
@@ -10,7 +10,7 @@ A SwiGLU block computes `down( silu(gate x) * (up x) )`. The gate decides which 
 
 ## Machines
 
-The MacBook is for editing code, writing the paper, plotting, and `--smoke` checks. Everything else runs on the PC with the RTX 3070.
+The MacBook is for editing code, writing the paper, plotting, and `--smoke` checks. Every GPU experiment runs on Kaggle's free T4s (see "Running on a cloud GPU" below); the local PC is not used.
 
 ## Files
 
@@ -23,7 +23,7 @@ The MacBook is for editing code, writing the paper, plotting, and `--smoke` chec
 | `plot.py` | turns results/*.json into `paper/figures/*.pdf` and `paper/tables/*.tex` |
 | `tests.py` | correctness tests, to run after every code change |
 | `cloud_run.py`, `make_cloud_notebook.py` | run the experiments on a free cloud GPU from one self-contained notebook |
-| `paper/` | ICLR 2027 template (`main.tex`) with the official style files left untouched |
+| `paper/` | the paper (`main.tex`); the ICLR 2027 style file is a placeholder until CPAL publishes its template (same 9-page main text) |
 
 Every script accepts `--help`. Each also accepts `--smoke`, which runs a toy check in under a minute and downloads nothing.
 
@@ -68,7 +68,7 @@ After every session: unzip, `git add results && git commit`, rebuild the noteboo
 
 A T4 has no native bfloat16. Exp. A therefore runs in float32 on every model, and Exp. B and C use float16 with loss scaling. Each result file records its precision and GPU. All of Exp. B has to come from this one recipe: don't put runs from different precisions or GPUs into one table. The "Commands, in order" below describe the same experiments run directly on a local GPU and are kept for reference.
 
-### Day 3: go or no-go (decide by 6 pm Sunday Sep 20)
+### Go or no-go (decide by 6 pm Sunday Sep 27)
 
 Look at `paper/figures/posthoc_*.pdf` and at the pilot runs. The noise floor is |S_dense_s0 − S_dense_s1| in final validation loss, and a gap smaller than that doesn't count as a result.
 

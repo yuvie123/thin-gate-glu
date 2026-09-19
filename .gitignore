@@ -17,3 +17,4 @@ results/logs/
 cloud_notebook.ipynb
 thin_gate_results.zip
 logs/
+notebook*.ipynb

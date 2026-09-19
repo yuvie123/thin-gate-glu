@@ -8,6 +8,13 @@
 \usepackage{amsmath,amssymb}
 
 % ---------------------------------------------------------------------------------------------
+% TARGET VENUE: CPAL 2027, Proceedings Track (abstract registration Nov 23, paper Dec 5, 2026).
+%  * The ICLR 2027 style file below is a PLACEHOLDER: CPAL's LaTeX template was not published when this
+%    was written (links appear on cpal.cc/openreview/). Swap it in as soon as it is available. Both allow
+%    9 pages of main text, so the page budget does not change.
+%  * CPAL: double-blind, archival (PMLR), arXiv preprint allowed, AI tools allowed with authors fully
+%    responsible for accuracy, originality, citations and ethics.
+% ---------------------------------------------------------------------------------------------
 % HOW TO USE THIS FILE
 %  * Upload the whole paper/ folder to Overleaf (New Project -> Upload Project) and compile main.tex.
 %  * Do NOT touch margins, fonts or the .sty file: format violations are desk-rejected.
@@ -17,7 +24,8 @@
 %  * Citations: lines marked "% CITE:" name the arXiv id to cite. Export the BibTeX yourself from
 %    the arXiv/DBLP/Semantic Scholar page into references.bib, read the paper, then add \citep{key}.
 %    Never cite a paper you have not opened.
-%  * Main text limit: 9 pages. References, the statements at the end and the appendix do not count.
+%  * Main text limit: 9 pages (CPAL). References and the appendix do not count; check the CPAL template
+%    for whether the statements at the end count once it is published.
 % ---------------------------------------------------------------------------------------------
 
 \title{Do GLU Gates Need Full Rank? An Asymmetry Study of Transformer Feed-Forward Blocks}
@@ -109,8 +117,9 @@ Cholesky factor $\mS\mS^\top = \mX\mX^\top$ we truncate the SVD of $\mW\mS$ and 
 \section{Experiments}
 \subsection{Setup}
 \todo{Models, data (FineWeb GPT-2 tokens; wikitext-2 test for perplexity), token budgets, optimizer, learning
-rate and how it was chosen (same sweep for every arm), seeds, hardware (one consumer GPU with 8\,GB).
-Full hyperparameters go in the appendix.}
+rate and how it was chosen (same sweep for every arm), seeds, hardware: every experiment ran on NVIDIA T4
+GPUs (16\,GB) on a public cloud notebook service; post-hoc truncation in float32, pretraining and conversion
+in float16 with loss scaling, because the T4 has no native bfloat16. Full hyperparameters go in the appendix.}
 
 \subsection{Which projection tolerates rank reduction in pretrained models?}
 \todo{Figure~\ref{fig:posthoc}; tables/posthoc\_plain.tex and tables/posthoc\_whiten.tex.}
@@ -138,7 +147,8 @@ matmuls may not be faster at these sizes; conclusions may not transfer to larger
 
 % ----------------------------------------------------------------------------------------------
 \subsection*{AI use statement}
-% REQUIRED by ICLR 2027. EDIT THIS so that every sentence is true for what you actually did.
+% CPAL 2027 permits AI tools and holds the authors fully responsible; keep this statement and EDIT IT so that
+% every sentence is true for what you actually did.
 In this work, we used generative AI tools (a large language model assistant) to propose and refine the
 research hypothesis, to design and provide feedback on the experimental methodology, to implement the
 methods, data-preparation and evaluation code, to clean and reformat the evaluation data, and to help
@@ -165,13 +175,13 @@ ideas were checked for prior work through a manual literature search. We take re
 final content of this work, including text, claims or artifacts produced with the aid of generative AI.
 
 \subsection*{Ethics statement}
-% RECOMMENDED by ICLR 2027, page-limit exempt, max 1 page.
+% Kept from the ICLR draft; CPAL does not require it. Check the CPAL template for whether it counts toward pages.
 This work studies the parameter efficiency of feed-forward layers in language models. It involves no human
 subjects, no personal or sensitive data, and no new data collection: every experiment uses publicly available
 pretrained models and public text corpora under their respective licences. We see no direct path from this
 work to harmful application beyond the general dual-use character of making language models cheaper to run.
-Our experiments were deliberately small and ran on a single consumer GPU, which keeps their energy cost low
-but also bounds the conclusions we can draw, as we set out in the limitations.
+Our experiments were deliberately small and ran on a few dozen hours of shared T4 GPU time, which keeps
+their energy cost low but also bounds the conclusions we can draw, as we set out in the limitations.
 
 \subsection*{Reproducibility statement}
 All architectural details of the thin-gate GLU and of the control arms are given in

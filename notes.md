@@ -362,3 +362,83 @@ withdrawn from ICLR before its Sep 25 paper deadline is deleted, which frees it 
 Not announced yet on their own sites: ICML 2027 (an aggregator says Jan 22, 2027; unofficial), ACL 2027 via the
 ARR January cycle, COLM 2027, MLSys 2027, ICLR 2027 workshops. arXiv is open any time but a first submission
 to cs.LG needs an endorser.
+
+## 2026-09-19
+
+### Kaggle session 1 taken in: Exp. A on 7 models, T4, float32 (first paper-grade result)
+
+The author downloaded `thin_gate_results.zip` (84 KB) from the Kaggle Output tab; unzipped into the repo
+root with Python's `zipfile`. Session ran 21:04 to 05:24 UTC on Sep 17-18, about 8.3 h, inside the 7-8 h
+guess. `logs/_runner.log`: two Tesla T4 (15.6 GB, compute capability 7.5, so float32 for Exp. A and
+float16 for Exp. B); `tests.py` 6/6, `posthoc smoke` ok, `train smoke` ok; torch 2.10.0+cu128,
+transformers 5.0.0, datasets 5.0.0. No job failed. `meta-llama/Llama-3.2-1B` was skipped (gated, no token).
+
+- **Throughput check** (size S, dense, 20M tokens, float16 with loss scaling, one T4, `torch.compile` on):
+  **62,990 tokens/s**, peak memory 2.2 GB, val loss 5.66. One 300M-token size-S run is therefore about 1.3 h,
+  under the 1.5 h rule, so `TOKENS["S"] = 300e6` stays. Runner's own estimate: 6 pilot runs on two T4s,
+  about 4 h. These numbers live only in `results/scratch/throughput_check.json` and `logs/` (gitignored),
+  hence recorded here. `TOKENS["M"]` is still unmeasured; measure before `main_M`, never during.
+- **Exp. A, 14 result files** in `results/posthoc/` (7 models x whiten/plain), 18 settings each (3 projections
+  x 6 rank fractions), full wikitext-2 test split, `dtype: float32`, `device: Tesla T4`. Baseline
+  perplexities: SmolLM2-135M 17.493 (CPU full split gave 17.463; same evaluation, different precision),
+  SmolLM2-360M 12.955, SmolLM2-1.7B 9.091, Qwen2.5-0.5B 14.651, Qwen2.5-1.5B 10.403, TinyLlama v1.1 8.586,
+  OLMo-2-0425-1B 10.343. All plausible.
+- Committed `results/posthoc/` and the outputs of `python plot.py` (run on the Mac in a fresh `.venv` with
+  numpy and matplotlib only): `paper/figures/posthoc_{whiten,plain}.pdf`, `paper/tables/posthoc_*.tex`.
+
+**What the whitened figure shows (perplexity / baseline; the go/no-go figure), stated plainly:**
+
+- Over the 42 cells (7 models x 6 ranks), the gate is the most tolerant projection in 26, down in 16, up in 0.
+- **Gate beats up in 41 of 42 cells.** The one exception is SmolLM2-360M at r/d = 0.25 (26.1 vs 26.0, a tie).
+- At r/d = 0.75 and 0.5 the gate is the best projection in every one of the 7 models (Qwen2.5-0.5B at 0.5 is a
+  near-tie with down, 1.76 vs 1.71).
+- At r/d = 0.25 and below, down overtakes the gate in 5 of 7 models (SmolLM2-135M/360M/1.7B, Qwen2.5-1.5B,
+  TinyLlama). Gate stays best at every rank only in OLMo-2-1B and Qwen2.5-0.5B. This is the same crossover
+  the 8-window CPU probe showed on 135M, now seen across models.
+- Plain SVD (42 cells): gate best in 34, up in 6 (SmolLM2-360M at 0.75/0.5/0.375/0.0625, SmolLM2-1.7B at
+  0.75, Qwen2.5-1.5B at 0.0625), down in 2. Plain truncation is destructive everywhere below r/d = 0.75, as
+  before, so it is the secondary figure.
+
+Honest one-line summary: **up is the fragile projection in every model; the gate is the most tolerant at
+moderate rank in every model; gate vs down crosses over at aggressive rank, in down's favour.** This is
+consistent with WeLore's post-hoc observation (gate more low-rank than up/down) and refines it: the
+advantage over up is universal, the advantage over down is rank-dependent. The paper must say both.
+
+Against the README criterion ("go if in most models the gate curve sits clearly below up and down at
+equal rank, whitened"): at the ranks Exp. B actually uses (d/2 and d/4, i.e. r/d = 0.5 and 0.25) the
+criterion is met for gate vs up in all 7 models and for gate vs down at 0.5 in all 7, at 0.25 in 4 of 7.
+That is a "go" for gate vs up and a qualified "go" for gate vs down; the formal decision waits for the
+pilot's noise floor (Sun Sep 27, see the venue entry below). None of these numbers goes into the paper
+by hand; `plot.py` regenerates the figure and table from the JSONs.
+
+Open plotting item, not changed today: the figure's x-axis is rank / full rank. Because d_ff/d differs
+between model families, the same rank fraction is a different parameter saving (recorded as
+`param_ratio`; e.g. r/d = 0.75 is 1.03x dense for SmolLM2 but 0.88x for Qwen2.5-0.5B). Decide before the
+Results section whether to plot against `param_ratio` instead, and say which in the caption.
+
+The detached CPU sweep of Exp. A on SmolLM2-135M (started 2026-09-17 16:21) is **dropped**: its output could
+not be retrieved, and the T4 float32 run of the same model supersedes it. Nothing from it was ever in
+`results/posthoc/`.
+
+### 2026-09-19: ICLR 2027 missed; new target is CPAL 2027 (decision, author)
+
+The ICLR 2027 abstract registration was not filed before Sat Sep 19, 07:59 EDT. ICLR 2027 is therefore out.
+Nothing was registered, so there is nothing to withdraw and no de-anonymization exposure. Deadlines were
+re-checked today on the venues' own pages; this table supersedes the 2026-09-17 one.
+
+| Venue | Deadline | Status for a sole first-time undergrad author |
+|---|---|---|
+| **CPAL 2027, Proceedings Track (chosen)** | abstract registration **Nov 23**, paper **Dec 5, 2026**; notification Feb 1; conference Mar 23-26, 2027 | 9 pages main text plus unlimited refs/appendix; double-blind; archival (PMLR); arXiv preprint allowed; no reciprocal-reviewing rule found; "sparsity, structured sparsity, low rank" is a listed topic; AI tools permitted with authors fully responsible. Template and OpenReview links go up on cpal.cc/openreview/ "as they become active": not up yet. |
+| CPAL 2027 Recent Spotlight | Jan 18, 2027 | non-archival, single-blind, 250-word abstract plus material; the safety net if the proceedings paper is not ready or is rejected elsewhere |
+| AISTATS 2027 | abstract Sep 29, paper Oct 6 | **out**: every submission must nominate a reciprocal reviewer with roughly 2nd-year-PhD experience and top-venue publications; a sole undergrad cannot, and the CFP says such submissions may be desk-rejected |
+| ARR October 2026 (NAACL/COLING 2027) | Oct 12 | **out**: from this cycle, review is only guaranteed with a "qualified service contributor", otherwise a lottery |
+| MLSys 2027 | Oct 30, 20:00 UTC | backup only: 10 pages, double-blind, no reciprocal rule, but a systems venue and only six weeks, which would mean writing while the grid runs |
+| TMLR | rolling | fallback after a CPAL rejection: judged on whether the claims are supported |
+| ICML 2027 | not announced (aggregators guess Jan 2027) | not planned for |
+
+Consequences: the schedule stretches from 8 days to 11 weeks (see `HANDOFF.md`, "Next, in order"). Exp. B
+at sizes S and M with three seeds, Exp. C and the benchmark become realistic on Kaggle's quota, and the
+must-read papers can be read before any of them is cited. The go/no-go moves to **Sun Sep 27, 6 pm** (Exp.
+A figure plus the pilot's noise floor); experiments freeze **Nov 8**; abstract registration Nov 23; aim to
+upload Dec 3. The paper stays in the ICLR style file as a placeholder until the CPAL template is published
+(both allow 9 pages of main text). The AI-use, ethics and reproducibility statements stay.

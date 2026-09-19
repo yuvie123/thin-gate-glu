@@ -1,79 +1,96 @@
 # Handoff notes for coding sessions in this repo
 
-Read `README.md` (commands, go/no-go criteria, honesty rules) and `PLAN.md` (idea, abstract, titles, schedule) before doing anything. `SETUP_PC.md` and `setup_pc.sh` cover machine setup. `related.md` is the reading list.
+Read `README.md` (commands, go/no-go criteria, honesty rules) and `PLAN.md` (idea, abstract, titles; its
+8-day ICLR schedule is history) before doing anything. `SETUP_PC.md` and `setup_pc.sh` cover the local
+machine, which is no longer used for experiments. `related.md` is the reading list. `notes.md` is the dated
+run log and the place where every decision is recorded.
 
 ## Who and what
-- The author is a first-year CS undergraduate writing a first research paper, comfortable with Python and **new to PyTorch**. Explain ML-research steps (baselines, seeds, noise floor, out-of-memory fixes) instead of assuming them.
-- Project: a single ICLR 2027 submission on **thin-gate GLU**: factorize only the gate projection of SwiGLU to low rank, keep up/down dense. Abstract due 2026-09-18 AOE (Sat Sep 19, 07:59 EDT); paper due 2026-09-25 AOE (Sat Sep 26, 07:59 EDT). Go/no-go decision on Sun 2026-09-20. Experiments freeze Wed Sep 23 noon.
-- Ideas already ruled out by a novelty search (do not revisit): smaller Q/K than V dimension (published, arXiv 2603.04427); lossy LM-head vocabulary shortlisting; frequency-aware embedding compression.
+- The author is a first-year CS undergraduate writing a first research paper, comfortable with Python and
+  **new to PyTorch**. Explain ML-research steps (baselines, seeds, noise floor, out-of-memory fixes) instead
+  of assuming them. Sole author; nobody available as a co-author or reciprocal reviewer.
+- Project: one submission on **thin-gate GLU**: factorize only the gate projection of SwiGLU to low rank,
+  keep up/down dense. **Target: CPAL 2027, Proceedings Track** (Conference on Parsimony and Learning, Tokyo,
+  Mar 23-26, 2027). **Abstract registration Nov 23, 2026; paper Dec 5, 2026** (aim to upload Dec 3);
+  notification Feb 1, 2027. 9 pages main text, double-blind, archival PMLR proceedings, arXiv preprint
+  allowed. The ICLR 2027 abstract deadline (Sep 19) was missed; nothing was registered there.
+- Fallbacks, in order: CPAL Recent Spotlight (non-archival, Jan 18, 2027), TMLR (rolling). AISTATS 2027 and
+  the ARR October cycle are closed to a sole first-time author (reciprocal-reviewer / service-contributor
+  rules; verified 2026-09-19, table in `notes.md`). MLSys 2027 (Oct 30) is not pursued.
+- Milestones: **go/no-go Sun Sep 27, 6 pm EDT**; **experiments freeze Sun Nov 8**; abstract registration Nov 23.
+- Ideas already ruled out by a novelty search (do not revisit): smaller Q/K than V dimension (published,
+  arXiv 2603.04427); lossy LM-head vocabulary shortlisting; frequency-aware embedding compression.
 
 ## Machines
-- **This GPU PC** (Ryzen 7, RTX 3070 **8 GB**, Windows + WSL2 Ubuntu) runs every real experiment. Size everything for 8 GB.
-- A weak MacBook is used only for editing, paper writing and plotting. Results travel between machines as small JSON files through git (`results/`, `paper/figures`, `paper/tables`). Never commit data, weights or checkpoints.
-- The GitHub repo is **private and must stay private** until reviews finish (double-blind). Never change its visibility, never put names, usernames, repo URLs or machine names in the paper, code comments or result files.
+- **Every GPU experiment runs on Kaggle (2x Tesla T4, 15.6 GB each, no native bfloat16).** Exp. A in
+  float32, Exp. B/C in float16 with loss scaling. Never pool results from another GPU or precision.
+  `make_cloud_notebook.py --run <steps>` builds a self-contained notebook that carries the code and every
+  finished result; the author uploads it, runs it, downloads `thin_gate_results.zip`, drops it in the repo
+  root (gitignored). Unzip it with Python's `zipfile` into the repo root; files land in `results/...` and
+  `logs/`. Kaggle's free quota was about 30 GPU-hours a week when last checked.
+- The local Windows PC (Ryzen 7, RTX 3070, 8 GB) is **not** used for experiments by the author's decision.
+  With eleven weeks it would lift the quota ceiling if the author changes their mind; nothing depends on it.
+- This MacBook is for editing, the paper, plotting and `--smoke` checks. `.venv` here holds only numpy and
+  matplotlib (enough for `plot.py`); there is no torch on the Mac, so `tests.py` and `grid.py` (which imports
+  `train.py`) run only inside the Kaggle notebook's check step.
+- Results travel as small JSON files through git (`results/posthoc`, `results/train`, `results/heal`,
+  `results/bench`, `paper/figures`, `paper/tables`). `results/scratch` and `logs/` are gitignored: copy any
+  number you need from them into `notes.md`. Never commit data, weights, checkpoints or the downloaded
+  Kaggle notebook (`notebook*.ipynb`).
+- The GitHub repo is **private and must stay private** until reviews finish (double-blind). Never change its
+  visibility, never put names, usernames, repo URLs or machine names in the paper, code comments or result
+  files.
 
 ## Status (update this section as work proceeds)
-- 2026-09-17 (Day 0): all experiment code written; `tests.py` passes (6 tests).
-- **GPU route, decided 2026-09-17: everything runs on Kaggle T4s, not on the local RTX 3070** (the author does
-  not want to load it). WSL2 is therefore not needed. `make_cloud_notebook.py --run <steps>` builds a
-  self-contained notebook with the code and all finished results inside; the author uploads it, runs it,
-  downloads `thin_gate_results.zip`, unzips it here. Exp. A is float32, Exp. B/C float16 with loss
-  scaling, all on T4s; never pool with runs from another GPU or precision. Session plan in `README.md`
-  and `notes.md`. Windows sleep on AC is set to never.
-- **Running now (started 2026-09-17):** (a) Kaggle session 1, speed check + Exp. A on all ungated models,
-  started by the author about 17:00 EDT, expected 7-8 h (an estimate; nothing had run on a T4 before it).
-  The author will drop `thin_gate_results.zip` into this folder without unzipping it; unzip it yourself with Python's
-  `zipfile` into the repo root so files land in `results/posthoc/`, `results/scratch/`, `logs/`. First check
-  `logs/_runner.log`: the three smoke lines must say ok, and the SmolLM2-135M baseline must be near 17.46.
-  (b) A CPU sweep of Exp. A on SmolLM2-135M, detached from any session, started 16:21, about 8.5 h, whitened
-  first; progress in `results/logs/cpu_sweep_status.txt` and `results/logs/posthoc_135M_*.log`, output in
-  `results/scratch/posthoc_cpu/`. It is an early look only and never goes into `results/posthoc/`.
-  `plot.py` needs matplotlib, which is not yet installed in the Windows `.venv`.
+- 2026-09-17 (Day 0): all experiment code written; `tests.py` passes (6 tests). Cloud route built and chosen.
 - **Novelty narrowed 2026-09-17:** WeLore (arXiv 2407.11239, ICML 2025) already reports that `gate_proj` is
   more low-rank than `up_proj`/`down_proj` in pretrained LLMs. Exp. A is therefore a controlled test of a
-  known observation; the novel part is Exp. B (thin gate from scratch, with controls), which needs a GPU.
+  known observation; the novel part is Exp. B (thin gate from scratch, with controls) and secondarily Exp. C.
   The intro must start from WeLore. Details in `related.md` (top entry) and `notes.md`.
-- **First evidence (probe only, not for the paper):** on SmolLM2-135M, 8 windows, the gate tolerated
-  truncation best in 5 of 6 settings and beat the up-projection in all 6; gate vs down crosses over at
-  the lowest rank under whitening. Table in `notes.md`. Encouraging, one model, proves nothing yet.
-- **No paper-grade experiment result exists yet.** An earlier CPU sweep was lost after 2 of 18 configs when
-  the session that owned it was closed (hence the detached relaunch above). What the CPU work established: the evaluation is sound (full-split baseline perplexity **17.463**,
-  plausible tens), and two real bugs are fixed (`Salesforce/wikitext` dataset id under datasets>=4;
-  fp32 instead of emulated bf16 on CPU). The Windows `.venv` (Python 3.12, torch CPU) is an interim
-  tool, not the machine of record. Never write CPU results into `results/posthoc/`. See `notes.md`.
-- Paper: title and the numbers-free abstract are submission-ready; the AI-use, ethics and reproducibility
-  statements are written. 12 `\todo`s remain, all needing results or reading. **`references.bib` is
-  still empty and no paper in `related.md` has been read yet** -- the biggest risk to Sep 25, ahead of the
-  experiments. The four must-read arXiv ids are verified against their pages (ids only, not read).
-- OpenReview form inspected 2026-09-17. The PDF is NOT required at the abstract deadline, but Title,
-  Authors, Keywords, Abstract, Primary Area, Code of Ethics, Paper Visibility, Submission Requirements,
-  Reciprocal Reviewing Author, Reciprocal Reviewing Exemption, AI Assistance and License all are.
-  **The reciprocal-reviewing fields cannot be changed after the abstract deadline**, and a first-time
-  author must claim the exemption there or risk desk rejection. License is CC BY 4.0 (the only option).
-  Still missing: the Primary Area dropdown options.
-
-- Alternative venues and their deadlines (AISTATS Oct 6, ARR Oct 12, CPAL Dec 5, TMLR rolling) are tabulated in
-  `notes.md`. The author is weighing ICLR on Sep 25 against withdrawing (deleted if before Sep 25) and
-  aiming at CPAL or TMLR with a fuller paper. Decide at the Sunday go/no-go; it is the author's call.
+- **2026-09-19: Kaggle session 1 taken in. First paper-grade result exists.** Exp. A finished on 7 models
+  (SmolLM2-135M/360M/1.7B, Qwen2.5-0.5B/1.5B, TinyLlama v1.1, OLMo-2-1B; Llama-3.2-1B skipped, gated), T4,
+  float32, full wikitext-2 test split; all checks ok; committed in `results/posthoc/` with figures and tables
+  from `plot.py`. Whitened SVD: **gate beats up in 41 of 42 cells; gate is the most tolerant projection in
+  every model at r/d = 0.75 and 0.5; below r/d = 0.25 down overtakes gate in 5 of 7 models.** Full reading in
+  `notes.md`. This meets the README "go" criterion for gate vs up, and for gate vs down at the ranks Exp. B
+  uses, with the crossover to be reported as a finding. Formal go/no-go waits for the pilot noise floor.
+- **Throughput measured 2026-09-19:** 62,990 tokens/s for size S in float16 on one T4, peak memory 2.2 GB.
+  One 300M-token size-S run is about 1.3 h, so **`TOKENS["S"] = 300e6` stays**. `TOKENS["M"]` is unmeasured:
+  measure it before `main_M` starts, never during (rule 3).
+- The detached CPU sweep of Exp. A (2026-09-17) was lost and is dropped; the T4 run supersedes it.
+- Paper: title and the numbers-free abstract are written (`paper/main.tex`, `paper/openreview_abstract_form.md`,
+  now a CPAL checklist); the AI-use, ethics and reproducibility statements are written; hardware wording now
+  says T4. The paper still uses the **ICLR 2027 style file as a placeholder** because CPAL's template is not
+  published; check cpal.cc/openreview/ and swap when it is (same 9-page limit). 12 `\todo`s remain.
+  **`references.bib` is still empty and no paper in `related.md` has been read yet.**
+- Open plotting decision: `posthoc_*.pdf` uses rank / full rank on the x-axis; the same rank fraction is a
+  different parameter saving across model families (`param_ratio` is recorded). Decide before Results.
 
 ### Next, in order
-1. **File the abstract form by Friday evening** (hard limit Sat Sep 19, 7:59 AM EDT) from
-   `paper/openreview_abstract_form.md`.
-2. Kaggle session 1 is running. When the zip arrives: unzip, verify, `git add results`, commit, push, install
-   matplotlib, run `python plot.py`, and report gate vs up vs down per model plainly, whichever way it points.
-3. Fix `TOKENS["S"]` in `grid.py` from the measured tokens/s, BEFORE any grid run; rerun `tests.py`.
-4. Session 2: `--run pilot`. Sunday 6 pm: go/no-go on the Exp. A figure plus the pilot.
-5. Sessions 3-4: `--run main_S`, then `--run heal,bench`. Experiments freeze Wed Sep 23 noon.
-6. The author reads WeLore first, then the other must-reads (`related.md`); BibTeX only after reading.
-7. Update `paper/main.tex` where it still says the experiments ran on one 8 GB consumer GPU.
+1. **Session 2:** `python make_cloud_notebook.py --run pilot` (6 runs, about 4 h on two T4s). Upload, run,
+   download, unzip, verify `logs/_runner.log`, commit `results/train/`, `python plot.py`, log in `notes.md`.
+2. **Sun Sep 27, 6 pm: go / pivot / no-go** on the Exp. A whitened figure plus the pilot noise floor
+   `|S_dense_s0 - S_dense_s1|` (criteria in `README.md`). Record the decision in `notes.md`.
+3. Meanwhile the author reads WeLore (Sec. 2.1, 2.4, 3.1, Figs 1, 3, 7) first, then the other must-reads in
+   `related.md`; BibTeX exported from each paper's page only after reading it.
+4. **Sep 28 - Oct 11:** `--run main_S` over two sessions (33 runs x 1.3 h / 2 GPUs, about 22 h; key arms
+   first, so a cut-off session still yields the 5 key arms x 3 seeds). Related Work and Method drafts.
+5. **Oct 12 - Oct 25:** measure size-M throughput, set `TOKENS["M"]`, rerun `tests.py`, then `--run main_M`
+   (14 runs), then `--run heal,bench`. Setup and Exp. A results sections.
+6. **Oct 26 - Nov 8:** `--stage lr` if quota allows; optional lm-eval zero-shot. Results for B and C;
+   Limitations. **Freeze Nov 8.** If quota runs short, drop size M before dropping seeds at size S.
+7. **Nov 9 - 22:** introduction (last), abstract with real numbers, appendix table (`grid.py --table`), swap
+   in the CPAL template. **Nov 23: abstract registration** on OpenReview (`paper/openreview_abstract_form.md`).
+8. **Nov 24 - Dec 3:** full read-through, anonymity check, PDF metadata, anonymized code zip. Upload by Dec 3
+   (hard deadline Dec 5).
 
 ## Rules for this project (non-negotiable)
 1. **Never fabricate or guess** results, citations, or benchmark numbers. Every number in the paper comes from a JSON in `results/` via `plot.py`. `paper/references.bib` entries are exported by the author from the paper's own page after reading it, never written from memory.
-2. Report failures and unflattering results plainly (e.g. low-rank arms not being faster). A negative result is acceptable; an unsupported claim is an ethics violation at ICLR.
+2. Report failures and unflattering results plainly (e.g. low-rank arms not being faster, down beating gate at low rank). A negative result is acceptable; an unsupported claim is an ethics violation.
 3. Fair comparisons: identical data order, token budget, schedule, learning rate and seeds across arms. Never tune the method more than the baseline. If `TOKENS` in `grid.py` must change for time, change it before a grid starts and rerun everything at that size.
 4. Compare every gap to the seed-to-seed spread of the dense baseline before calling it an effect.
-5. Run `python tests.py` after any change to `model.py`, `grid.py`, `posthoc_truncate.py` or `data.py`.
-6. Long jobs run inside `tmux`. Don't start a second GPU job while one is running (8 GB).
+5. Run `python tests.py` after any change to `model.py`, `grid.py`, `posthoc_truncate.py` or `data.py` (on Kaggle, via the notebook's check step, since the Mac has no torch).
+6. One Kaggle session at a time; rebuild the notebook after any code change, because the copy inside an old notebook does not update.
 7. Keep a dated `notes.md` log of every run launched, failures, and decisions.
 8. AI use is disclosed in the paper (`paper/main.tex`, AI use statement). Keep that statement true as the work evolves. The author must understand and be able to defend everything; explain what you do and why.
 9. Commit with clear messages; push small result files so the Mac can plot and write.
