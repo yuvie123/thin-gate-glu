@@ -86,7 +86,10 @@ run log and the place where every decision is recorded.
    `README.md`; the pilot result argues for pivot or no-go as titled, see `notes.md` 2026-09-20 for the
    options). If the author wants three seeds behind the decision first, session 3 is
    `python make_cloud_notebook.py --run main_S`, which runs the 9 missing key-arm runs first (about 7 h on
-   two T4s) and skips the 6 finished ones. Record the decision in `notes.md`.
+   two T4s) and skips the 6 finished ones. Grid steps now carry `--max_hours 11`: the runner starts no new
+   run after 9.3 h so the 12 h Kaggle commit finishes with its output (a killed commit keeps nothing).
+   One session yields about 14 of the 27 remaining runs; a second finishes the stage. Record the decision
+   in `notes.md`.
 3. Meanwhile the author reads WeLore (Sec. 2.1, 2.4, 3.1, Figs 1, 3, 7) first, then the other must-reads in
    `related.md`; BibTeX exported from each paper's page only after reading it.
 4. **Sep 28 - Oct 11:** `--run main_S` over two sessions (33 runs x 1.3 h / 2 GPUs, about 22 h; key arms

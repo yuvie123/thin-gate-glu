@@ -36,9 +36,9 @@ STEPS = {   # name -> (heading, command, note)
                 "perplexity close to 17.46, the value measured on the CPU."),
     "pilot": ("Experiment B: pilot runs", "python cloud_run.py pilot",
               "Dense (two seeds, which gives the noise floor), shrunk, thin-gate, thin-up, thin-down at size S."),
-    "main_S": ("Experiment B: all arms at size S, three seeds", "python cloud_run.py grid --stage main_S", ""),
-    "main_M": ("Experiment B: key arms at size M, two seeds", "python cloud_run.py grid --stage main_M", ""),
-    "lr": ("Experiment B: learning-rate check", "python cloud_run.py grid --stage lr", ""),
+    "main_S": ("Experiment B: all arms at size S, three seeds", "python cloud_run.py grid --stage main_S --max_hours 11", ""),
+    "main_M": ("Experiment B: key arms at size M, two seeds", "python cloud_run.py grid --stage main_M --max_hours 11", ""),
+    "lr": ("Experiment B: learning-rate check", "python cloud_run.py grid --stage lr --max_hours 11", ""),
     "heal": ("Experiment C: truncate, then train only the new factors", "python cloud_run.py heal", ""),
     "bench": ("Measured speed and memory of every arm", "python cloud_run.py bench", ""),
 }
@@ -174,7 +174,9 @@ except Exception:
         code("!python cloud_run.py check"),
         md("## 7. This session's work\n"
            "Planned steps, in order: **" + ", ".join(plan) + "**. After every finished job the zip is refreshed, so "
-           "a session that is cut off still leaves usable results. All of Experiment B runs on this kind of GPU: "
+           "a session that is cut off still leaves usable results, and grid steps stop starting new runs after "
+           "about 9 h so the 12 h commit finishes (a killed commit keeps no output). All of Experiment B runs on "
+           "this kind of GPU: "
            "runs made here in float16 must never be pooled with runs made elsewhere in bfloat16."),
     ]
     for step in plan:

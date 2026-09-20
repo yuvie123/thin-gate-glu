@@ -48,6 +48,7 @@ ZIP_NAME = "thin_gate_results.zip"
 
 print_lock = threading.Lock()
 pack_lock = threading.Lock()
+DEADLINE = None     # epoch seconds; set by --max_hours. After it, no new job starts (the running ones finish).
 
 
 def say(msg):
@@ -110,6 +111,11 @@ def run_jobs(gpu, jobs, dry):
             continue
         if dry:
             say(f"gpu{gpu} [would]  {label}: {' '.join(cmd[1:])}")
+            continue
+        if DEADLINE is not None and time.time() > DEADLINE:
+            # a Kaggle commit that overruns its 12 h is killed and its output is not saved, so a job that
+            # cannot finish in time is left for the next session instead of started
+            say(f"gpu{gpu} [skip]   {label}: past the launch deadline, left for the next session")
             continue
         log_path = os.path.join("logs", label + ".log")
         env = dict(os.environ, CUDA_VISIBLE_DEVICES=str(gpu), PYTHONUNBUFFERED="1", TOKENIZERS_PARALLELISM="false")
@@ -285,7 +291,16 @@ if __name__ == "__main__":
     ap.add_argument("--models", default="", help="posthoc: comma-separated subset of the model list")
     ap.add_argument("--stage", default="pilot", help="grid: which grid.py stage to run")
     ap.add_argument("--dry", action="store_true")
+    ap.add_argument("--max_hours", type=float, default=0.0,
+                    help="stop starting new jobs once this many hours minus --job_hours have passed (0 = no cap). "
+                         "Use 11 on Kaggle so a 12 h commit finishes and keeps its output.")
+    ap.add_argument("--job_hours", type=float, default=1.7,
+                    help="how long one job may take; the last job starts this long before --max_hours")
     args = ap.parse_args()
+    if args.max_hours > 0:
+        DEADLINE = time.time() + (args.max_hours - args.job_hours) * 3600
+        say(f"launch deadline: no new job after {args.max_hours - args.job_hours:.1f} h "
+            f"(--max_hours {args.max_hours:g}, --job_hours {args.job_hours:g}); running jobs finish")
     if args.what == "pilot":
         args.stage = "pilot"
     {"check": cmd_check, "posthoc": cmd_posthoc, "throughput": cmd_throughput, "pilot": cmd_grid,

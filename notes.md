@@ -519,3 +519,19 @@ were restored rather than committed as noise.
 Housekeeping: `.gitignore` now ignores `thin_gate_results*.zip` so a browser-renamed download does not show
 as untracked. `logs/train__*.log` stay gitignored; every number needed from them is in this entry or in the
 JSONs.
+
+### 2026-09-20, 01:20: launch deadline added to the runner before session 3 (main_S)
+
+`main_S` has 27 runs left after the pilot, about 19 h on two T4s at 1.5 h each, so it cannot fit one 12 h
+Kaggle commit. A commit that overruns is killed and Kaggle keeps none of its output, so the notebook's
+"a cut-off session still leaves usable results" was only true for an interactive session. `cloud_run.py`
+now takes `--max_hours` and `--job_hours` (default 1.7): after `max_hours - job_hours` it starts no new job
+and lets the running ones finish. `make_cloud_notebook.py` passes `--max_hours 11` to the `main_S`, `main_M`
+and `lr` steps, so the last size-S run starts before 9.3 h and the commit ends inside 12 h with the zip
+intact. Expected yield of session 3: about 14 of the 27 runs, the 9 key-arm runs first (three seeds for
+dense, thin gate, thin up, thin down, shrunk), then 5 from the rest. Session 4 finishes the stage; the
+runner skips what is done. `--job_hours` must be raised for size M once its run time is measured.
+
+Tested on the Mac with fake jobs and a faked two-GPU count (no torch here): no cap runs everything, a
+deadline in the past skips everything with a `[skip]` line in `_runner.log`, a deadline in the future runs
+everything. `tests.py` is unaffected (rule 5 does not list `cloud_run.py`). Notebook rebuilt.
