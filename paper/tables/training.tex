@@ -2,10 +2,16 @@
 \toprule
 Size & Arm & MLP params & Val. loss (mean $\pm$ std) & Seeds & Tokens/s \\
 \midrule
-S & dense & 7,077,888 & 4.0850 $\pm$ 0.0023 & 2 & 54,423 \\
-S & shrunk r4 & 5,529,600 & 4.1043 $\pm$ n/a & 1 & 60,482 \\
-S & thin up r4 & 5,529,600 & 4.1171 $\pm$ n/a & 1 & 60,005 \\
-S & thin gate r4 & 5,529,600 & 4.1250 $\pm$ n/a & 1 & 59,893 \\
-S & thin down r4 & 5,529,600 & 4.1470 $\pm$ n/a & 1 & 56,171 \\
+S & dense & 7,077,888 & 4.0942 $\pm$ 0.0159 & 3 & 57,086 \\
+S & shrunk r2 & 6,359,040 & 4.0969 $\pm$ n/a & 1 & 62,782 \\
+S & shrunk r8 & 5,142,528 & 4.1009 $\pm$ n/a & 1 & 59,840 \\
+S & reinvest r4 & 7,064,064 & 4.1039 $\pm$ n/a & 1 & 60,850 \\
+S & shrunk r4 & 5,529,600 & 4.1070 $\pm$ 0.0047 & 3 & 61,663 \\
+S & thin gate r2 & 6,340,608 & 4.1076 $\pm$ n/a & 1 & 57,619 \\
+S & thin up r4 & 5,529,600 & 4.1155 $\pm$ 0.0015 & 3 & 61,338 \\
+S & thin gate r4 & 5,529,600 & 4.1182 $\pm$ 0.0059 & 3 & 61,250 \\
+S & thin gate r8 & 5,124,096 & 4.1313 $\pm$ n/a & 1 & 65,260 \\
+S & thin down r4 & 5,529,600 & 4.1435 $\pm$ 0.0065 & 3 & 60,080 \\
+S & all lowrank r4 & 5,474,304 & 4.1682 $\pm$ n/a & 1 & 57,619 \\
 \bottomrule
 \end{tabular}

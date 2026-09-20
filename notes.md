@@ -535,3 +535,76 @@ runner skips what is done. `--job_hours` must be raised for size M once its run 
 Tested on the Mac with fake jobs and a faked two-GPU count (no torch here): no cap runs everything, a
 deadline in the past skips everything with a `[skip]` line in `_runner.log`, a deadline in the future runs
 everything. `tests.py` is unaffected (rule 5 does not list `cloud_run.py`). Notebook rebuilt.
+
+### 2026-09-20, 15:15: Kaggle session 3 taken in: main_S, 15 runs, key arms now at three seeds
+
+Zip renamed `thin_gate_results_session3_mainS.zip` (browser name was `thin_gate_results (2).zip`). Session
+ran 05:41 to 16:11 UTC, 10.5 h. Checks ok, same library versions. The launch deadline worked as designed:
+after 9.3 h the runner logged 12 `[skip]` lines (seeds 1 and 2 of the six "rest" arms) and the commit
+finished inside 12 h with the zip intact. No job failed; no nan, inf or overflow in any log. 15 new files
+in `results/train/`, committed; the 6 pilot files and the 14 Exp. A files came back byte-identical.
+
+Now in hand at size S, 300M tokens: dense, shrunk r4, thin gate r4, thin up r4, thin down r4 at seeds
+0-2; thin gate r2/r8, shrunk r2/r8, reinvest r4, all-lowrank r4 at seed 0. Still to do for `main_S`:
+those six arms at seeds 1-2 (12 runs, one more session).
+
+| Arm | s0 | s1 | s2 | mean | range | MLP params |
+|---|---|---|---|---|---|---|
+| dense | 4.0867 | 4.0834 | 4.1125 | 4.0942 | 0.029 | 7,077,888 |
+| shrunk r2 | 4.0969 | | | | | 6,359,040 |
+| shrunk r8 | 4.1009 | | | | | 5,142,528 |
+| reinvest r4 | 4.1039 | | | | | 7,064,064 |
+| shrunk r4 | 4.1043 | 4.1043 | 4.1124 | 4.1070 | 0.008 | 5,529,600 |
+| thin gate r2 | 4.1076 | | | | | 6,340,608 |
+| thin up r4 | 4.1171 | 4.1145 | 4.1147 | 4.1155 | 0.003 | 5,529,600 |
+| thin gate r4 | 4.1250 | 4.1151 | 4.1145 | 4.1182 | 0.011 | 5,529,600 |
+| thin gate r8 | 4.1313 | | | | | 5,124,096 |
+| thin down r4 | 4.1470 | 4.1476 | 4.1360 | 4.1435 | 0.012 | 5,529,600 |
+| all lowrank r4 | 4.1682 | | | | | 5,474,304 |
+
+**The noise floor moved.** Dense seed 2 finished at 4.1125, 0.029 above seeds 0 and 1, and it was
+behind them at every evaluation from step 250 on (not a late spike; the largest jump between consecutive
+train-loss prints is 0.15, normal). The seed sets both the init and the data order (`data.py`), and every
+other seed-2 arm landed where its seeds 0 and 1 did (gate 4.1145, up 4.1147, shrunk 4.1124), so this is one
+unlucky dense run, not a hard data order. The README floor is now the dense range, **0.029**, ten times the
+pilot's 0.003. The pilot's "12x the noise floor" language is withdrawn.
+
+**What three seeds say, stated plainly:**
+
+- Mean order unchanged from the pilot: **dense < shrunk < thin up < thin gate < thin down**, with
+  all-lowrank last.
+- **Thin gate never beats shrunk.** Paired by seed, shrunk is better at s0 (by 0.021) and s1 (by 0.011)
+  and tied at s2 (0.002). At seed 0 the same holds at rank d/2 (shrunk better by 0.011) and d/8 (by 0.031):
+  the gap widens as the gate gets thinner.
+- **Thin gate and thin up are indistinguishable**: means 0.003 apart, seed ranges 0.011 and 0.003, and the
+  order flips between seeds (gate worse at s0, better at s1, tied at s2). The pilot's "up beats gate" is
+  not supported; "gate beats up" is not either.
+- **Thin down is clearly worst** of the three single-projection arms: 0.025 to 0.028 behind gate and up on
+  the mean, worse at every seed, and the seed ranges do not overlap. Factorizing all three is worse still.
+- Against dense: the four parameter-matched r4 arms are 0.013 (shrunk) to 0.049 (down) worse on the mean.
+  With the dense range at 0.029, only thin down and all-lowrank are outside it; shrunk, thin up and thin
+  gate sit inside the band of dense seeds. Reinvest (thin gate + wider d_ff, dense parameter count) is
+  0.010 worse than dense on the mean at one seed, inside the band.
+- Tokens/s in the table is not a speed measurement: the same arm ranged from 54k to 65k depending on which
+  job shared the machine (dense s2 62k vs s0/s1 54k). Speed claims wait for `bench.py`.
+
+**Against the go/no-go criteria, with seeds:** the pilot verdict stands and is now firmer. Thin gate r4 is
+not within the (small) pilot floor of dense, does not beat shrunk at any of three ranks, and is not better
+than thin up. The gate hypothesis as titled fails at this scale. What the two experiments show together is
+sharper than a null: **the projection that tolerates truncation best after training (gate, Exp. A) is not
+the one that trains best at low rank (gate = up, Exp. B), and the one that is most fragile after training
+(up) is not the one that hurts most when trained thin (down).** Post-hoc rank tolerance does not predict
+from-scratch trainability, in either direction. That is the contrast result (option 3 of 2026-09-20).
+
+Options for the Sep 27 decision, updated (author's call):
+
+1. **Contrast paper** (recommended by the assistant, not decided): keep Exp. A, B and C; retitle. Exp. B's
+   headline figure becomes a rank sweep of all three projections from scratch, which needs `thin_up_r2/r8`
+   and `thin_down_r2/r8` added to `grid.py` (a code change: rerun `tests.py` in the notebook's check step,
+   rule 5) and run at three seeds: 12 runs, one session, on top of session 4's 12 remaining `main_S` runs.
+2. Finish `main_S` as planned first (session 4, 12 runs, fits one commit), then decide.
+3. No-go. Not recommended: the controlled negative is publishable under rule 2, and CPAL lists low-rank
+   structure as a topic.
+
+Size M is unchanged in the plan (measure throughput first). Nothing from session 3 is in `paper/main.tex`
+yet; `figures/training.pdf` and `tables/training.tex` are regenerated (11 arms) and committed.

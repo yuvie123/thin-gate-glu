@@ -79,17 +79,22 @@ run log and the place where every decision is recorded.
   options (finish `main_S` key arms for seeds; add rank d/2 arms; reframe as a contrast result; no-go) are
   in `notes.md`. `plot.py` now also writes `figures/training.pdf` and `tables/training.tex`; the Exp. B
   results subsection stays a `\todo`.
+- **2026-09-20, evening: Kaggle session 3 taken in (main_S, 15 of 27 runs; the launch deadline worked).**
+  Key arms at three seeds: dense 4.094 (range 0.029, one unlucky seed), shrunk r4 4.107, thin up r4 4.116,
+  thin gate r4 4.118, thin down r4 4.144. Thin gate never beats shrunk (at d/2, d/4, d/8, seed 0), is
+  indistinguishable from thin up, and only thin down and all-lowrank are clearly worse than dense.
+  **Verdict firmer: the gate hypothesis as titled fails at size S.** The combined finding is that post-hoc
+  rank tolerance (Exp. A) does not predict from-scratch trainability (Exp. B). Table, reading and the
+  updated options are in `notes.md`. 12 `main_S` runs remain (seeds 1-2 of the six rest arms).
 
 ### Next, in order
-1. ~~Session 2: pilot~~ done 2026-09-20 (see Status).
-2. **Sun Sep 27, 6 pm: go / pivot / no-go** on the Exp. A whitened figure plus the pilot (criteria in
-   `README.md`; the pilot result argues for pivot or no-go as titled, see `notes.md` 2026-09-20 for the
-   options). If the author wants three seeds behind the decision first, session 3 is
-   `python make_cloud_notebook.py --run main_S`, which runs the 9 missing key-arm runs first (about 7 h on
-   two T4s) and skips the 6 finished ones. Grid steps now carry `--max_hours 11`: the runner starts no new
-   run after 9.3 h so the 12 h Kaggle commit finishes with its output (a killed commit keeps nothing).
-   One session yields about 14 of the 27 remaining runs; a second finishes the stage. Record the decision
-   in `notes.md`.
+1. ~~Session 2: pilot~~ done 2026-09-20. ~~Session 3: main_S key arms~~ done 2026-09-20 (15 runs).
+2. **Sun Sep 27, 6 pm: go / pivot / no-go.** The data now argue for the **contrast paper** (post-hoc
+   tolerance does not predict trainability; Exp. A, B, C kept; retitle). Before or after the decision,
+   session 4 is `python make_cloud_notebook.py --run main_S` for the 12 remaining runs (fits one commit).
+   If the contrast framing is chosen, add `thin_up_r2/r8` and `thin_down_r2/r8` to `grid.py` (rule 5:
+   `tests.py` reruns in the notebook's check step) so Exp. B's headline figure is a rank sweep of all three
+   projections at three seeds (12 more runs, one session). Record the decision in `notes.md`.
 3. Meanwhile the author reads WeLore (Sec. 2.1, 2.4, 3.1, Figs 1, 3, 7) first, then the other must-reads in
    `related.md`; BibTeX exported from each paper's page only after reading it.
 4. **Sep 28 - Oct 11:** `--run main_S` over two sessions (33 runs x 1.3 h / 2 GPUs, about 22 h; key arms
