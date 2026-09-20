@@ -183,9 +183,16 @@ def cmd_check(args):
             say(f"gpu{i}: too old for torch.compile; Exp. B will run with --no_compile (slower). Prefer a T4.")
     if args.dry:
         return
+    smoke = [sys.executable, "train.py", "--smoke"]
     for label, cmd in [("tests.py", [sys.executable, "tests.py"]),
                        ("posthoc smoke", [sys.executable, "posthoc_truncate.py", "--smoke"]),
-                       ("train smoke", [sys.executable, "train.py", "--smoke"])]:
+                       ("train smoke", smoke),
+                       # every screening code path, compiled on the GPU, before any real run starts
+                       ("smoke monarch", smoke + ["--name", "smoke_monarch", "--gate_monarch", "2"]),
+                       ("smoke grouped", smoke + ["--name", "smoke_grouped", "--gate_groups", "2", "--gate_rank", "0"]),
+                       ("smoke spectral", smoke + ["--name", "smoke_spectral", "--lowrank_init", "spectral", "--factor_wd", "none"]),
+                       ("smoke bottleneck", smoke + ["--name", "smoke_bottleneck", "--bottleneck", "norm_silu"]),
+                       ("smoke warm start", smoke + ["--name", "smoke_warm", "--thin_at", "0.5"])]:
         r = subprocess.run(cmd, capture_output=True, text=True)
         tail = (r.stdout + r.stderr).strip().splitlines()[-1:] or [""]
         say(f"{label}: {'ok' if r.returncode == 0 else 'FAILED'}   {tail[0]}")

@@ -11,6 +11,7 @@ Stages follow the day-by-day plan:
     main_S  Day 4-5: all arms at size S, seeds 0-2
     main_M  Day 4-5: the five key arms at size M, seeds 0-1
     big_L   stretch: dense vs thin-gate at size L, one seed
+    screen  size S, seed 0: variants that might beat shrunk_r4 at the same parameter count (see screen_arms)
 
 Arms (r = rank, d = d_model, F = default d_ff):
     dense            standard SwiGLU
@@ -20,6 +21,15 @@ Arms (r = rank, d = d_model, F = default d_ff):
     shrunk_rK        dense SwiGLU with smaller d_ff, same parameter count as thin_gate_rK
     all_lowrank_rK   all three factorized at one rank, same parameter count as thin_gate_rK
     reinvest_rK      thin gate + wider d_ff, same parameter count as dense
+
+Screening arms (all matched to thin_gate_r4 / shrunk_r4):
+    thin_gate_r4_{spectral,nowd,halfwd,spectral_nowd}   the same thin gate with a different factor init / decay
+    grouped_{gate,up,down}_g4   one value per 4 hidden units for that projection, d_ff widened to compensate
+    monarch_gate_b4             the gate is a Monarch (block-structured, full-rank) matrix with 4 blocks
+    monarch_gate_b2_narrow      2 blocks, d_ff narrowed to compensate
+    bottleneck_{,norm_}gate_r4  thin gate with a silu (and RMSNorm) between the two factors
+    warm_gate_r4_f{10,25}       dense gate for the first 10% / 25% of steps, then thinned to rank d/4 (not a
+                                matched from-scratch arm: it costs a little more training compute)
 """
 
 import argparse
@@ -52,13 +62,45 @@ def arms_for(size, divisors):
     return arms
 
 
+def screen_arms(size, K=4):
+    """Variants at the parameter count of thin_gate_rK (= shrunk_rK), size S seed 0 first."""
+    _, _, d, F = SIZES[size]
+    r = d // K
+    thin_params = 2 * d * F + r * (d + F)
+    Fg = round_to(thin_params / (d * (2 + 1 / K)), 8)            # grouped: d*F/K + 2*d*F = thin_params
+    Fg -= Fg % K                                                 # the groups must divide d_ff
+    F2 = round_to((thin_params - d * d // 2) / (2.5 * d), 8)     # Monarch nb=2: d*d/2 + d*F/2 + 2*d*F
+    F2 -= F2 % 2
+    return {
+        f"monarch_gate_b{K}": {"gate_monarch": K},
+        f"grouped_gate_g{K}": {"d_ff": Fg, "gate_groups": K},
+        f"thin_gate_r{K}_spectral_nowd": {"gate_rank": r, "lowrank_init": "spectral", "factor_wd": "none"},
+        f"warm_gate_r{K}_f25": {"gate_rank": r, "thin_at": 0.25},
+        f"bottleneck_gate_r{K}": {"gate_rank": r, "bottleneck": "silu"},
+        f"thin_gate_r{K}_nowd": {"gate_rank": r, "factor_wd": "none"},
+        f"thin_gate_r{K}_spectral": {"gate_rank": r, "lowrank_init": "spectral"},
+        f"warm_gate_r{K}_f10": {"gate_rank": r, "thin_at": 0.1},
+        f"bottleneck_norm_gate_r{K}": {"gate_rank": r, "bottleneck": "norm_silu"},
+        f"grouped_up_g{K}": {"d_ff": Fg, "up_groups": K},
+        f"grouped_down_g{K}": {"d_ff": Fg, "down_groups": K},
+        f"thin_gate_r{K}_halfwd": {"gate_rank": r, "factor_wd": "half"},
+        "monarch_gate_b2_narrow": {"gate_monarch": 2, "d_ff": F2},
+    }
+
+
 def mlp_params(size, arm):
+    """MLP parameters per layer for an arm dict (the keys are train.py flags)."""
     _, _, d, F = SIZES[size]
     F = arm.get("d_ff", F)
     total = 0
-    for key in ("gate_rank", "up_rank", "down_rank"):
-        r = arm.get(key, 0)
-        total += r * (d + F) if r else d * F
+    for proj, (n_in, n_out) in (("gate", (d, F)), ("up", (d, F)), ("down", (F, d))):
+        r, g, nb = arm.get(f"{proj}_rank", 0), arm.get(f"{proj}_groups", 1), arm.get(f"{proj}_monarch", 0)
+        if r:
+            total += r * (n_in + n_out) + (r if arm.get("bottleneck") == "norm_silu" else 0)
+        elif nb:
+            total += n_in * n_in // nb + n_in * n_out // nb          # two block-diagonal factors
+        else:
+            total += n_in * n_out // g
     return total
 
 
@@ -66,8 +108,8 @@ def runs_for(stage):
     """Returns a list of (name, size, arm_kwargs, seed, extra_args)."""
     out = []
 
-    def add(size, arm_names, seeds, divisors=(2, 4, 8), extra=None, tag=""):
-        arms = arms_for(size, divisors)
+    def add(size, arm_names, seeds, divisors=(2, 4, 8), extra=None, tag="", arms=None):
+        arms = arms or arms_for(size, divisors)
         for seed in seeds:
             for a in arm_names:
                 out.append((f"{size}_{a}{tag}_s{seed}", size, arms[a], seed, extra or {}))
@@ -89,6 +131,9 @@ def runs_for(stage):
         add("M", ["reinvest_r4", "thin_gate_r8"], [0, 1])
     elif stage == "big_L":
         add("L", ["dense", "thin_gate_r4"], [0], extra={"micro_bs": 4})
+    elif stage == "screen":
+        arms = screen_arms("S")
+        add("S", list(arms), [0], arms=arms)      # priority order: the launch deadline drops the tail
     else:
         sys.exit(f"unknown stage {stage}")
     return out
@@ -114,9 +159,9 @@ if __name__ == "__main__":
         for size in SIZES:
             base = mlp_params(size, {})
             print(f"\nsize {size}: MLP parameters per layer (dense = {base:,})")
-            for name, arm in arms_for(size, (2, 4, 8)).items():
+            for name, arm in {**arms_for(size, (2, 4, 8)), **screen_arms(size)}.items():
                 p = mlp_params(size, arm)
-                print(f"  {name:18s} {p:>10,}  ({100 * p / base:5.1f}% of dense)  {arm}")
+                print(f"  {name:26s} {p:>10,}  ({100 * p / base:5.1f}% of dense)  {arm}")
         sys.exit()
 
     todo = runs_for(args.stage)

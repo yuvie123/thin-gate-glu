@@ -30,9 +30,10 @@ run log and the place where every decision is recorded.
   `logs/`. Kaggle's free quota was about 30 GPU-hours a week when last checked.
 - The local Windows PC (Ryzen 7, RTX 3070, 8 GB) is **not** used for experiments by the author's decision.
   With eleven weeks it would lift the quota ceiling if the author changes their mind; nothing depends on it.
-- This MacBook is for editing, the paper, plotting and `--smoke` checks. `.venv` here holds only numpy and
-  matplotlib (enough for `plot.py`); there is no torch on the Mac, so `tests.py` and `grid.py` (which imports
-  `train.py`) run only inside the Kaggle notebook's check step.
+- This MacBook is for editing, the paper, plotting and `--smoke` checks. `.venv` here holds numpy, matplotlib
+  and, since 2026-09-20, a CPU build of torch, so `python tests.py`, `python train.py --smoke ...` and
+  `python grid.py --stage ...` all run here (use `.venv/bin/python`). The Kaggle check step still reruns
+  them on the GPU, compiled, before any real run.
 - Results travel as small JSON files through git (`results/posthoc`, `results/train`, `results/heal`,
   `results/bench`, `paper/figures`, `paper/tables`). `results/scratch` and `logs/` are gitignored: copy any
   number you need from them into `notes.md`. Never commit data, weights, checkpoints or the downloaded
@@ -79,6 +80,17 @@ run log and the place where every decision is recorded.
   options (finish `main_S` key arms for seeds; add rank d/2 arms; reframe as a contrast result; no-go) are
   in `notes.md`. `plot.py` now also writes `figures/training.pdf` and `tables/training.tex`; the Exp. B
   results subsection stays a `\todo`.
+- **2026-09-20, night: screening stage built (decision, author: screen new variants before finishing
+  `main_S`; structural changes to the gate allowed).** Goal: a variant at the shrunk_r4 budget (921,600 MLP
+  params/layer) whose seed-0 loss is at or below 4.100 (shrunk s0 = 4.1043). `grid.py --stage screen`, 13
+  runs at size S seed 0 in priority order: Monarch gate (block-structured, full rank, same params as rank
+  d/4), grouped gate (one gate value per 4 units, d_ff 1064), thin gate with spectral init and/or no factor
+  decay, warm-started thin gate (dense gate for 10% / 25% of steps, then whitened SVD to rank d/4; reported
+  separately, it costs about 1% more train compute), nonlinear bottleneck gate, plus grouped up/down
+  controls and two fillers. New flags in `train.py` (`--gate_groups/--up_groups/--down_groups`,
+  `--gate_monarch`, `--lowrank_init`, `--bottleneck`, `--factor_wd`, `--thin_at`); `tests.py` has 11 tests;
+  every old arm is bit-for-bit unchanged (smoke curve identical to the previous commit). Decision rule and
+  design in `notes.md` 2026-09-20 (screen entry). Session 4 = `--run screen,main_S`.
 - **2026-09-20, evening: Kaggle session 3 taken in (main_S, 15 of 27 runs; the launch deadline worked).**
   Key arms at three seeds: dense 4.094 (range 0.029, one unlucky seed), shrunk r4 4.107, thin up r4 4.116,
   thin gate r4 4.118, thin down r4 4.144. Thin gate never beats shrunk (at d/2, d/4, d/8, seed 0), is
@@ -89,13 +101,18 @@ run log and the place where every decision is recorded.
 
 ### Next, in order
 1. ~~Session 2: pilot~~ done 2026-09-20. ~~Session 3: main_S key arms~~ done 2026-09-20 (15 runs).
-2. **Sun Sep 27, 6 pm: go / pivot / no-go.** The data now argue for the **contrast paper** (post-hoc
-   tolerance does not predict trainability; Exp. A, B, C kept; retitle). Before or after the decision,
-   session 4 is `python make_cloud_notebook.py --run main_S` for the 12 remaining runs (fits one commit).
-   If the contrast framing is chosen, add `thin_up_r2/r8` and `thin_down_r2/r8` to `grid.py` (rule 5:
-   `tests.py` reruns in the notebook's check step) so Exp. B's headline figure is a rank sweep of all three
-   projections at three seeds (12 more runs, one session). Record the decision in `notes.md`.
-3. Meanwhile the author reads WeLore (Sec. 2.1, 2.4, 3.1, Figs 1, 3, 7) first, then the other must-reads in
+2. **Session 4 (built, upload next):** `python make_cloud_notebook.py --run screen,main_S`: the 13 screen
+   runs first, then whatever of the 12 remaining `main_S` runs fit before the launch deadline. Take in as
+   usual; then apply the decision rule in `notes.md` (promote a variant to seeds 1-2 plus its up/down
+   controls if its final loss is at or below 4.100 and below shrunk at the last three evals; one more seed
+   if between 4.100 and 4.1043; drop otherwise). Warm start is judged separately as the Exp. A/B bridge.
+3. **Sun Sep 27, 6 pm: go / pivot / no-go.** If a screened variant is promoted and holds up with seeds, the
+   paper is about that variant ("which structure on the gate", or "selection is cheap" if the grouped gate
+   wins). If none does, the data argue for the **contrast paper** (post-hoc tolerance does not predict
+   trainability; Exp. A, B, C kept; retitle), which then wants `thin_up_r2/r8` and `thin_down_r2/r8` added
+   to `grid.py` so Exp. B's headline figure is a rank sweep of all three projections at three seeds (12
+   runs, one session). Record the decision in `notes.md`.
+4. Meanwhile the author reads WeLore (Sec. 2.1, 2.4, 3.1, Figs 1, 3, 7) first, then the other must-reads in
    `related.md`; BibTeX exported from each paper's page only after reading it.
 4. **Sep 28 - Oct 11:** `--run main_S` over two sessions (33 runs x 1.3 h / 2 GPUs, about 22 h; key arms
    first, so a cut-off session still yields the 5 key arms x 3 seeds). Related Work and Method drafts.

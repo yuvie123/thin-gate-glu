@@ -111,11 +111,11 @@ def arm_of(name):            # "S_thin_gate_r4_s0" -> ("S", "thin_gate_r4")
 
 
 def arm_color(arm):
-    if arm.startswith(("thin_gate", "reinvest")):
+    if arm.startswith(("thin_gate", "reinvest", "monarch_gate", "grouped_gate", "bottleneck", "warm_gate")):
         return STYLE["gate_proj"][0]
-    if arm.startswith("thin_up"):
+    if arm.startswith(("thin_up", "grouped_up")):
         return STYLE["up_proj"][0]
-    if arm.startswith("thin_down"):
+    if arm.startswith(("thin_down", "grouped_down")):
         return STYLE["down_proj"][0]
     return NEUTRAL
 

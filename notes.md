@@ -608,3 +608,64 @@ Options for the Sep 27 decision, updated (author's call):
 
 Size M is unchanged in the plan (measure throughput first). Nothing from session 3 is in `paper/main.tex`
 yet; `figures/training.pdf` and `tables/training.tex` are regenerated (11 arms) and committed.
+
+### 2026-09-20, night: screening stage for variants that could beat shrunk (decision, author)
+
+The author asked for something new that beats `shrunk_r4` at the same parameter count, and chose to screen
+before finishing `main_S`, with structural changes to the gate allowed. Reasoning recorded first, then the
+design.
+
+**Why the thin gate loses, as far as three seeds can tell.** A SwiGLU neuron computes silu(k_i·x)(u_i·x)v_i:
+a product of two linear features of x, written along v_i. Rank-96 gate keys k_i all lie in one 96-dim
+subspace, so every gating decision in the layer sees only a 96-dim projection of the residual stream. Thin
+up restricts the other factor of the same product, and the silu is the only asymmetry between them, which is
+why thin gate and thin up land together. Thin down puts the *output* directions v_i in a 96-dim subspace,
+which is the harshest cut, and it is the worst arm. A narrower dense block (shrunk, 800 neurons with full
+keys) keeps every direction and simply has fewer neurons; at this scale that is the better trade at every
+rank tried. Exp. A's post-hoc tolerance of the gate is a property of trained gates (whitened, errors on
+inactive neurons are cheap), not evidence that gates can be *trained* in a small subspace.
+
+**Candidates, one sentence each, all at 921,600 MLP params/layer (±0.35%; checked by `tests.py`):**
+
+1. *Optimization fixes* for the existing thin gate: spectral init (factors = top-96 SVD of a dense random
+   init) and/or no weight decay on the factors (both factors decaying at 0.1 makes the product decay about
+   twice as fast). Diagnostic: is the deficit an optimizer artifact? Expected gain small.
+2. *Grouped gate* (`--gate_groups 4`, d_ff 1064): the gate computes 266 values, each gating 4 neighbouring
+   units; keys stay full rank, there are just fewer of them. This is the original thesis restated:
+   selection needs fewer *units*, not fewer *dimensions*. Grouped up / grouped down are the controls.
+3. *Monarch gate* (`--gate_monarch 4`): two block-diagonal matrices with a fixed shuffle between them;
+   exactly the parameter count of rank 96 (135,168) but full rank, every input reaches every output. The
+   Monarch literature trains such matrices near dense quality; best prior of beating shrunk.
+4. *Nonlinear bottleneck gate* (`--bottleneck silu` / `norm_silu`): B(silu(A x)), same parameters; the gate
+   becomes a tiny two-layer network. Cheap; likely ≈ thin gate.
+5. *Warm-started thin gate* (`--thin_at 0.25` / `0.1`): dense gate for the first 25% / 10% of steps, then
+   each gate is replaced by its whitened rank-96 SVD (grams from 32 calibration windows drawn with a private
+   RNG, so the training order is untouched; the optimizer keeps its state for every other parameter; the
+   compiled model is rebuilt) and training continues on the same schedule. About 1.2% / 0.5% more train
+   FLOPs, so it is **not** a matched from-scratch arm; it is the bridge between Exp. A and Exp. B and is
+   reported separately, with the validation loss right before and after the swap.
+
+**Stage `screen`** (`grid.py`, size S, seed 0, priority order; the launch deadline drops the tail):
+monarch_gate_b4, grouped_gate_g4, thin_gate_r4_spectral_nowd, warm_gate_r4_f25, bottleneck_gate_r4,
+thin_gate_r4_nowd, thin_gate_r4_spectral, warm_gate_r4_f10, bottleneck_norm_gate_r4, grouped_up_g4,
+grouped_down_g4, thin_gate_r4_halfwd, monarch_gate_b2_narrow (13 runs, about 9-10 h on two T4s). Session 4
+is `--run screen,main_S`, so leftover time goes to the 12 remaining `main_S` runs.
+
+**Decision rule (seed 0; shrunk s0 = 4.1043, its last evals 4.1276 / 4.1150 / 4.1061; dense s0 4.0867):**
+promote to seeds 1-2 plus the arm's up/down controls if final val ≤ 4.100 and below shrunk at each of the
+last three evals; run seed 1 first if 4.100 < val ≤ 4.1043 (promote only if seed 1 is also ≥ 0.004 better
+than shrunk s1 = 4.1043); drop otherwise. Warm start never enters the matched table. Rule 4 still applies:
+a single-seed gap is a trigger, not an effect. Honest expectation: none is guaranteed; Monarch and grouped
+have the best chance, the fixes are diagnostic, the bottleneck is a long shot.
+
+**Fairness (rule 3):** lr, schedule, tokens, batch, data order and seed are untouched for every arm. The
+init and decay variants are part of an arm's definition, not tuning; if one wins, the paper says the
+baselines received no such variants.
+
+**Verification done on the Mac** (a CPU torch was installed into `.venv` for this; the Kaggle check step
+repeats everything compiled on the GPU): `tests.py` 11/11 (the 6 old tests plus spectral init, bottleneck,
+grouped gate, Monarch, and the mid-training swap being exact at full rank while keeping Adam state);
+`train.py --smoke` for the baseline and all five new paths; the baseline smoke's validation curve is
+bit-identical to the previous commit's (`6.25308, 6.2524`), so every old arm is unchanged; the warm-start
+smoke thins at step 10 with params 73,728 → 57,344 and the JSON reports the final model. Parameter matching
+verified at S, M and L (table via `grid.py --table`).

@@ -38,6 +38,10 @@ STEPS = {   # name -> (heading, command, note)
               "Dense (two seeds, which gives the noise floor), shrunk, thin-gate, thin-up, thin-down at size S."),
     "main_S": ("Experiment B: all arms at size S, three seeds", "python cloud_run.py grid --stage main_S --max_hours 11", ""),
     "main_M": ("Experiment B: key arms at size M, two seeds", "python cloud_run.py grid --stage main_M --max_hours 11", ""),
+    "screen": ("Experiment B: screen of gate variants at the shrunk_r4 budget (size S, seed 0)",
+               "python cloud_run.py grid --stage screen --max_hours 11",
+               "Thirteen variants in priority order (grid.py screen_arms); the launch deadline drops the tail. "
+               "Compare each final loss with S_shrunk_r4_s0 = 4.1043 and S_dense_s0 = 4.0867."),
     "lr": ("Experiment B: learning-rate check", "python cloud_run.py grid --stage lr --max_hours 11", ""),
     "heal": ("Experiment C: truncate, then train only the new factors", "python cloud_run.py heal", ""),
     "bench": ("Measured speed and memory of every arm", "python cloud_run.py bench", ""),
