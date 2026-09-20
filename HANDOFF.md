@@ -70,12 +70,23 @@ run log and the place where every decision is recorded.
   generated figure and `tables/posthoc_whiten.tex`; no number typed by hand. Two `\todo`s mark the cells
   to re-verify (the single gate-vs-up tie, the single gate-vs-down near-tie at r/d = 1/2). The paper
   compiles with `tectonic` on the Mac (empty bibliography, expected).
+- **2026-09-20: Kaggle session 2 taken in. Exp. B pilot, 6 runs at size S, 300M tokens, float16, committed
+  in `results/train/`.** Noise floor |dense s0 − dense s1| = 0.0033. At equal parameters the order is
+  **dense 4.085 < shrunk 4.104 < thin up 4.117 < thin gate 4.125 < thin down 4.147**, stable from 27% of
+  training onward. **Neither pilot "go" condition in `README.md` is met**: thin gate is worse than shrunk and
+  than thin up, and far outside the dense noise floor. Post-hoc tolerance (Exp. A: up fragile, gate robust)
+  does not predict the from-scratch outcome. One seed per non-dense arm. Full reading and the author's
+  options (finish `main_S` key arms for seeds; add rank d/2 arms; reframe as a contrast result; no-go) are
+  in `notes.md`. `plot.py` now also writes `figures/training.pdf` and `tables/training.tex`; the Exp. B
+  results subsection stays a `\todo`.
 
 ### Next, in order
-1. **Session 2:** `python make_cloud_notebook.py --run pilot` (6 runs, about 4 h on two T4s). Upload, run,
-   download, unzip, verify `logs/_runner.log`, commit `results/train/`, `python plot.py`, log in `notes.md`.
-2. **Sun Sep 27, 6 pm: go / pivot / no-go** on the Exp. A whitened figure plus the pilot noise floor
-   `|S_dense_s0 - S_dense_s1|` (criteria in `README.md`). Record the decision in `notes.md`.
+1. ~~Session 2: pilot~~ done 2026-09-20 (see Status).
+2. **Sun Sep 27, 6 pm: go / pivot / no-go** on the Exp. A whitened figure plus the pilot (criteria in
+   `README.md`; the pilot result argues for pivot or no-go as titled, see `notes.md` 2026-09-20 for the
+   options). If the author wants three seeds behind the decision first, session 3 is
+   `python make_cloud_notebook.py --run main_S`, which runs the 9 missing key-arm runs first (about 7 h on
+   two T4s) and skips the 6 finished ones. Record the decision in `notes.md`.
 3. Meanwhile the author reads WeLore (Sec. 2.1, 2.4, 3.1, Figs 1, 3, 7) first, then the other must-reads in
    `related.md`; BibTeX exported from each paper's page only after reading it.
 4. **Sep 28 - Oct 11:** `--run main_S` over two sessions (33 runs x 1.3 h / 2 GPUs, about 22 h; key arms

@@ -442,3 +442,80 @@ must-read papers can be read before any of them is cited. The go/no-go moves to 
 A figure plus the pilot's noise floor); experiments freeze **Nov 8**; abstract registration Nov 23; aim to
 upload Dec 3. The paper stays in the ICLR style file as a placeholder until the CPAL template is published
 (both allow 9 pages of main text). The AI-use, ethics and reproducibility statements stay.
+
+## 2026-09-20
+
+### Kaggle session 2 taken in: Exp. B pilot, 6 runs at size S, T4, float16 (first from-scratch result)
+
+The author downloaded the zip (34 KB, named `thin_gate_results (1).zip` by the browser) and dropped it in
+the repo root; unzipped with Python's `zipfile`. Session ran 19:14 to 23:50 on Sep 19 (about 4.6 h, against
+the runner's 4 h estimate). `logs/_runner.log`: two Tesla T4, `tests.py` 6/6, posthoc smoke ok, train smoke
+ok, same library versions as session 1 (torch 2.10.0+cu128). No job failed; no nan, inf or overflow in any
+training log. The 14 Exp. A files in the zip are byte-identical to the committed ones (the notebook carries
+them so the runner can skip them). New: `results/train/S_*.json`, 6 files, committed.
+
+Recipe, identical across arms (rule 3): size S (6 layers, 6 heads, d = 384, d_ff = 1024), 300M tokens,
+4577 steps of 65,536 tokens, lr 1e-3 with 200 warmup steps and cosine to 1e-4, weight decay 0.1, grad clip
+1.0, float16 with loss scaling, `torch.compile` on, one T4 per run, two runs at a time. Validation every 250
+steps and at the end. All four rank-d/4 arms have exactly the same MLP parameter count (5,529,600 per
+layer-set vs 7,077,888 dense); gate/up/down rank is 96 = d/4; shrunk uses d_ff = 800.
+
+| Run | Final val loss | Gap to dense mean | Tokens/s | Wall |
+|---|---|---|---|---|
+| S_dense_s0 | 4.0867 | | 54,466 | 92 min |
+| S_dense_s1 | 4.0834 | | 54,380 | 92 min |
+| S_shrunk_r4_s0 | 4.1043 | +0.019 | 60,482 | 83 min |
+| S_thin_up_r4_s0 | 4.1171 | +0.032 | 60,005 | 84 min |
+| S_thin_gate_r4_s0 | 4.1250 | +0.040 | 59,893 | 84 min |
+| S_thin_down_r4_s0 | 4.1470 | +0.062 | 56,171 | 89 min |
+
+**Noise floor** |S_dense_s0 − S_dense_s1| = **0.0033** (dense mean 4.0850). The gaps above are 6x, 10x, 12x
+and 19x that floor, so all four parameter-matched arms are clearly worse than dense, and the differences
+between them are also outside the floor, with the caveat that each non-dense arm has one seed and the floor
+itself comes from only two seeds.
+
+**What the pilot shows, stated plainly:**
+
+- At equal parameter count, the ordering is **dense < shrunk < thin up < thin gate < thin down**. The plain
+  narrow SwiGLU (shrunk, d_ff = 800) is the best way to spend the budget; every factorized arm is worse.
+- **Thin gate does not beat shrunk** (it is 0.021 worse, 6x the floor), and it does **not** sit within the
+  noise floor of dense. Neither pilot "go" condition in `README.md` is met.
+- Thin gate is **worse than thin up** by 0.008 (2.4x the floor, one seed each). This is the opposite of
+  Exp. A, where the up-projection was the fragile one in 41 of 42 cells. Thin down is the worst arm, which
+  matches Exp. A only in the sense that down was never the most fragile there either; at r/d = 0.25 Exp. A
+  actually had down overtaking gate in 5 of 7 models. So **post-hoc rank tolerance in pretrained models does
+  not predict which projection to factorize when training from scratch**, at least at this scale.
+- The ordering is not a late fluctuation: from step 1250 (27% of training) to the end, every one of the 15
+  evaluations has the same order dense < shrunk < thin up < thin gate < thin down.
+- Speed: shrunk, thin up and thin gate are each 10-11% faster than dense in tokens/s; thin down only 3%
+  (its extra matmul sits on the wide d_ff side). Absolute tokens/s (54-60k) is below session 1's 63k for
+  the same dense recipe; the difference is probably the two concurrent jobs sharing the CPU data path
+  (unverified). Only the ratios between arms are used.
+
+**Against the README go/no-go, ahead of the Sun Sep 27 decision (the author's call, not made here):**
+the Exp. A criterion is met (logged 2026-09-19); the pilot criterion is not. Read together: the gate is the
+most rank-tolerant projection *after* training, but factorizing it *during* training is not the cheapest
+way to save those parameters, and up is a (slightly) better choice than gate. That is a pivot or no-go
+signal for the method as titled, but it is a clean, controlled finding in its own right. Options the author
+can weigh, none decided:
+
+1. Finish the key arms of `main_S` (dense, thin gate, thin up, thin down, shrunk; 9 more runs, about 7 h on
+   two T4s) to put three seeds behind every number before deciding. The 0.008 gate-vs-up gap especially
+   needs seeds. This is the planned next session anyway.
+2. Add the rank d/2 arms (`thin_gate_r2`, `shrunk_r2`, and `thin_up_r2` if added to `grid.py`) since Exp. A
+   showed the gate clearly best at r/d = 0.5 in all 7 models; if the from-scratch picture flips at milder
+   rank, the paper is about the rank regime. `thin_up_r2` and `thin_down_r2` are not in the grid today.
+3. Reframe as the contrast result: "post-hoc tolerance does not transfer to pretraining" with Exp. A, B
+   and C all kept. Title and abstract would change; rule 2 says a negative result is fine, a stretched
+   claim is not.
+4. No-go: stop after `main_S` if three seeds confirm the pilot.
+
+Nothing from this session goes into `paper/main.tex` yet: `plot.py` wrote `paper/figures/training.pdf` and
+`paper/tables/training.tex` (a 5-row table with one seed per non-dense arm), and the Exp. B results
+subsection stays a `\todo` until the seeds are in and the framing is decided. `plot.py` regenerated the
+Exp. A tables byte-identical and the Exp. A PDFs identical except for their embedded timestamp; those PDFs
+were restored rather than committed as noise.
+
+Housekeeping: `.gitignore` now ignores `thin_gate_results*.zip` so a browser-renamed download does not show
+as untracked. `logs/train__*.log` stay gitignored; every number needed from them is in this entry or in the
+JSONs.
