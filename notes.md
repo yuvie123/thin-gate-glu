@@ -669,3 +669,8 @@ grouped gate, Monarch, and the mid-training swap being exact at full rank while 
 bit-identical to the previous commit's (`6.25308, 6.2524`), so every old arm is unchanged; the warm-start
 smoke thins at step 10 with params 73,728 → 57,344 and the JSON reports the final model. Parameter matching
 verified at S, M and L (table via `grid.py --table`).
+
+Fix before upload: `--max_hours` used to count from each grid command's own start, so the second step of
+`--run screen,main_S` would have started a fresh 11 h clock after the screen and overrun the 12 h commit
+(which keeps no output). `cloud_run.py check` now writes `logs/_session_start.txt`, and every later
+`--max_hours` counts from that marker; verified with a 10 h old marker (a job is skipped) and without one.

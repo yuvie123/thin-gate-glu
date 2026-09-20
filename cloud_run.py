@@ -45,6 +45,7 @@ GATED = {"meta-llama/Llama-3.2-1B"}
 PACK_DIRS = ["results/posthoc", "results/train", "results/heal", "results/bench", "results/scratch", "logs"]
 HEAL_MODELS = ["HuggingFaceTB/SmolLM2-135M", "HuggingFaceTB/SmolLM2-360M"]      # as in README, Day 4-5
 ZIP_NAME = "thin_gate_results.zip"
+SESSION_START = os.path.join("logs", "_session_start.txt")   # written by `check`; --max_hours counts from it
 
 print_lock = threading.Lock()
 pack_lock = threading.Lock()
@@ -183,6 +184,9 @@ def cmd_check(args):
             say(f"gpu{i}: too old for torch.compile; Exp. B will run with --no_compile (slower). Prefer a T4.")
     if args.dry:
         return
+    os.makedirs("logs", exist_ok=True)
+    with open(SESSION_START, "w") as f:                 # every later step's --max_hours counts from here
+        f.write(str(time.time()))
     smoke = [sys.executable, "train.py", "--smoke"]
     for label, cmd in [("tests.py", [sys.executable, "tests.py"]),
                        ("posthoc smoke", [sys.executable, "posthoc_truncate.py", "--smoke"]),
@@ -305,9 +309,17 @@ if __name__ == "__main__":
                     help="how long one job may take; the last job starts this long before --max_hours")
     args = ap.parse_args()
     if args.max_hours > 0:
-        DEADLINE = time.time() + (args.max_hours - args.job_hours) * 3600
-        say(f"launch deadline: no new job after {args.max_hours - args.job_hours:.1f} h "
-            f"(--max_hours {args.max_hours:g}, --job_hours {args.job_hours:g}); running jobs finish")
+        # The budget counts from the session's check step (so several steps in one notebook share one clock),
+        # or from now when this command runs on its own.
+        start = time.time()
+        if os.path.exists(SESSION_START):
+            with open(SESSION_START) as f:
+                start = float(f.read())
+        elapsed = (time.time() - start) / 3600
+        DEADLINE = start + (args.max_hours - args.job_hours) * 3600
+        say(f"launch deadline: no new job after {args.max_hours - args.job_hours:.1f} h of the session "
+            f"({elapsed:.1f} h used so far; --max_hours {args.max_hours:g}, --job_hours {args.job_hours:g}); "
+            f"running jobs finish")
     if args.what == "pilot":
         args.stage = "pilot"
     {"check": cmd_check, "posthoc": cmd_posthoc, "throughput": cmd_throughput, "pilot": cmd_grid,
