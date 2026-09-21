@@ -2,6 +2,8 @@
 
 Code and paper for a submission to CPAL 2027 (Conference on Parsimony and Learning, Proceedings Track).
 
+[HANDOFF.md](HANDOFF.md) holds the current schedule, status and the go/no-go criteria; [notes.md](notes.md) is the dated run log where every decision is recorded; [PLAN.md](PLAN.md) is the original plan (its 8-day schedule is history); [related.md](related.md) is the reading list.
+
 A SwiGLU block computes `down( silu(gate x) * (up x) )`. The gate decides which hidden units are active; the up and down projections carry the content that gets written back. The three matrices have the same shape, so the question "is selection cheaper than content?" has a controlled test: restrict one projection at a time to the same rank, so the parameter savings are identical, and measure which restriction the model tolerates best.
 
 ## Results so far (training-free truncation)
@@ -87,7 +89,7 @@ python grid.py --stage lr --run          # if time: shows the comparison doesn't
 2. Every arm gets the same data order, token budget, learning-rate schedule and seeds. The method never gets more tuning than the baseline.
 3. Report mean ± std over seeds and compare each gap to the spread between dense seeds. A difference seen in one seed could be noise.
 4. Report measured tokens/s and memory, even if the low-rank arms turn out no faster on this GPU.
-5. Log failed and surprising runs with the date, so reviewer questions are easy to answer.
+5. Log failed and surprising runs in `notes.md` with the date, so reviewer questions are easy to answer.
 6. State the scale limits in the abstract, the introduction and the limitations section. Don't extrapolate to large models.
 7. Read every paper you cite, and export its BibTeX from the source page. Keep `related.md` current.
 8. Keep names, usernames, repo URLs and machine names out of the PDF, the code zip and the result files. The JSONs record only the GPU model.
