@@ -120,8 +120,30 @@ def arm_color(arm):
     return NEUTRAL
 
 
+def table_warm_start(runs, out_dir):
+    """Warm-started arms (dense gate for part of training, then thinned) cost more train compute than the
+    matched from-scratch arms, so they never enter the matched table; they get their own."""
+    runs = sorted(runs, key=lambda r: r["name"])
+    if not runs:
+        return
+    lines = ["\\begin{tabular}{llrrrrr}", "\\toprule",
+             "Size & Arm & Thinned at step & Val. before & Val. after & Final val. loss & MLP params \\\\", "\\midrule"]
+    for r in runs:
+        size, arm = arm_of(r["name"])
+        sw = r["log"]["thin_swap"]
+        lines.append(f"{size} & {arm.replace('_', ' ')} & {sw['step']} & {sw['val_before']:.4f} & {sw['val_after']:.4f} & "
+                     f"{r['final_val_loss']:.4f} & {r['params']['mlp']:,} \\\\")
+    lines += ["\\bottomrule", "\\end{tabular}"]
+    path = os.path.join(out_dir, "tables", "warm_start.tex")
+    open(path, "w").write("\n".join(lines) + "\n")
+    print("wrote", path)
+
+
 def plot_training(runs, out_dir):
     runs = [r for r in runs if "_lr" not in r["name"]]
+    warm = [r for r in runs if "thin_swap" in r.get("log", {})]     # not parameter-matched from step 0
+    table_warm_start(warm, out_dir)
+    runs = [r for r in runs if r not in warm]
     if not runs:
         return
     by = defaultdict(lambda: defaultdict(list))

@@ -99,30 +99,40 @@ run log and the place where every decision is recorded.
   rank tolerance (Exp. A) does not predict from-scratch trainability (Exp. B). Table, reading and the
   updated options are in `notes.md`. 12 `main_S` runs remain (seeds 1-2 of the six rest arms).
 
+- **2026-09-21: Kaggle session 4 taken in (screen, 13 runs at seed 0; none of the 12 leftover `main_S` runs
+  fit).** Decision rule applied: **all 13 variants dropped.** Best is thin gate r4 with spectral init and no
+  factor decay at 4.1127 vs shrunk r4 s0 4.1043 (bar: 4.100); the 13-arm spread (0.019) is below the dense seed
+  range (0.029). Optimizer fixes land inside the thin-gate seed range; grouped keeps gate < up < down, all above
+  shrunk; Monarch is last; warm start ends worse than from-scratch thin gate. The "which structure on the gate"
+  paper is off the table; only the contrast paper has support. Table and reading in `notes.md` 2026-09-21.
+  `plot.py` now writes `tables/warm_start.tex` and keeps warm-started arms out of the matched table.
+- **Repo state, 2026-09-21:** the remote's evening-of-Sep-20 README rewrite had deleted `notes.md`, `HANDOFF.md`
+  and `PLAN.md`; they are restored (README kept). Work happens in `~/thin-gate-glu`; the other checkout,
+  `~/Desktop/thin-gate-glu`, holds the `.venv` (numpy, matplotlib, CPU torch) but is behind: pull it or delete
+  it. Until a `.venv` exists here, run `plot.py`, `tests.py` and `make_cloud_notebook.py` with
+  `/Users/aman/Desktop/thin-gate-glu/.venv/bin/python`.
+
 ### Next, in order
 1. ~~Session 2: pilot~~ done 2026-09-20. ~~Session 3: main_S key arms~~ done 2026-09-20 (15 runs).
-2. **Session 4 (built, upload next):** `python make_cloud_notebook.py --run screen,main_S`: the 13 screen
-   runs first, then whatever of the 12 remaining `main_S` runs fit before the launch deadline. Take in as
-   usual; then apply the decision rule in `notes.md` (promote a variant to seeds 1-2 plus its up/down
-   controls if its final loss is at or below 4.100 and below shrunk at the last three evals; one more seed
-   if between 4.100 and 4.1043; drop otherwise). Warm start is judged separately as the Exp. A/B bridge.
-3. **Sun Sep 27, 6 pm: go / pivot / no-go.** If a screened variant is promoted and holds up with seeds, the
-   paper is about that variant ("which structure on the gate", or "selection is cheap" if the grouped gate
-   wins). If none does, the data argue for the **contrast paper** (post-hoc tolerance does not predict
-   trainability; Exp. A, B, C kept; retitle), which then wants `thin_up_r2/r8` and `thin_down_r2/r8` added
-   to `grid.py` so Exp. B's headline figure is a rank sweep of all three projections at three seeds (12
-   runs, one session). Record the decision in `notes.md`.
+   ~~Session 4: screen~~ done 2026-09-21 (13 runs, all dropped).
+2. **Session 5 (notebook built 2026-09-21, upload next):** `cloud_notebook.ipynb` from
+   `make_cloud_notebook.py --run main_S`: the 12 remaining `main_S` runs (seeds 1-2 of thin_gate_r2/r8,
+   shrunk_r2/r8, reinvest_r4, all_lowrank_r4), about 8.5 h on two T4s, inside one commit. Take in as usual.
+3. **Sun Sep 27, 6 pm: go / pivot / no-go.** The screen closed the "which structure on the gate" route. The
+   data argue for the **contrast paper** (post-hoc tolerance does not predict trainability; Exp. A, B, C kept;
+   retitle). If chosen, add `thin_up_r2/r8` and `thin_down_r2/r8` to `grid.py` (rerun `tests.py`) so Exp. B's
+   headline figure is a rank sweep of all three projections at three seeds (12 runs, one session). Record the
+   decision in `notes.md`.
 4. Meanwhile the author reads WeLore (Sec. 2.1, 2.4, 3.1, Figs 1, 3, 7) first, then the other must-reads in
    `related.md`; BibTeX exported from each paper's page only after reading it.
-4. **Sep 28 - Oct 11:** `--run main_S` over two sessions (33 runs x 1.3 h / 2 GPUs, about 22 h; key arms
-   first, so a cut-off session still yields the 5 key arms x 3 seeds). Related Work and Method drafts.
-5. **Oct 12 - Oct 25:** measure size-M throughput, set `TOKENS["M"]`, rerun `tests.py`, then `--run main_M`
+5. **Sep 28 - Oct 11:** the rank-sweep session if the contrast paper is chosen. Related Work and Method drafts.
+6. **Oct 12 - Oct 25:** measure size-M throughput, set `TOKENS["M"]`, rerun `tests.py`, then `--run main_M`
    (14 runs), then `--run heal,bench`. Setup and Exp. A results sections.
-6. **Oct 26 - Nov 8:** `--stage lr` if quota allows; optional lm-eval zero-shot. Results for B and C;
+7. **Oct 26 - Nov 8:** `--stage lr` if quota allows; optional lm-eval zero-shot. Results for B and C;
    Limitations. **Freeze Nov 8.** If quota runs short, drop size M before dropping seeds at size S.
-7. **Nov 9 - 22:** introduction (last), abstract with real numbers, appendix table (`grid.py --table`), swap
+8. **Nov 9 - 22:** introduction (last), abstract with real numbers, appendix table (`grid.py --table`), swap
    in the CPAL template. **Nov 23: abstract registration** on OpenReview (`paper/openreview_abstract_form.md`).
-8. **Nov 24 - Dec 3:** full read-through, anonymity check, PDF metadata, anonymized code zip. Upload by Dec 3
+9. **Nov 24 - Dec 3:** full read-through, anonymity check, PDF metadata, anonymized code zip. Upload by Dec 3
    (hard deadline Dec 5).
 
 ### Go or no-go (decide by 6 pm Sunday Sep 27)
@@ -145,7 +155,7 @@ After the go, the remaining sessions are `main_S`, `main_M`, then `heal,bench`, 
 2. Report failures and unflattering results plainly (e.g. low-rank arms not being faster, down beating gate at low rank). A negative result is acceptable; an unsupported claim is an ethics violation.
 3. Fair comparisons: identical data order, token budget, schedule, learning rate and seeds across arms. Never tune the method more than the baseline. If `TOKENS` in `grid.py` must change for time, change it before a grid starts and rerun everything at that size.
 4. Compare every gap to the seed-to-seed spread of the dense baseline before calling it an effect.
-5. Run `python tests.py` after any change to `model.py`, `grid.py`, `posthoc_truncate.py` or `data.py` (on Kaggle, via the notebook's check step, since the Mac has no torch).
+5. Run `python tests.py` after any change to `model.py`, `grid.py`, `posthoc_truncate.py` or `data.py` (on the Mac with the Desktop `.venv`, and again on Kaggle via the notebook's check step).
 6. One Kaggle session at a time; rebuild the notebook after any code change, because the copy inside an old notebook does not update.
 7. Keep a dated `notes.md` log of every run launched, failures, and decisions.
 8. AI use is disclosed in the paper (`paper/main.tex`, AI use statement). Keep that statement true as the work evolves. The author must understand and be able to defend everything; explain what you do and why.

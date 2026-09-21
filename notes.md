@@ -674,3 +674,91 @@ Fix before upload: `--max_hours` used to count from each grid command's own star
 `--run screen,main_S` would have started a fresh 11 h clock after the screen and overrun the 12 h commit
 (which keeps no output). `cloud_run.py check` now writes `logs/_session_start.txt`, and every later
 `--max_hours` counts from that marker; verified with a 10 h old marker (a job is skipped) and without one.
+
+## 2026-09-21
+
+### 2026-09-21: Kaggle session 4 taken in: screen, 13 runs at seed 0, no variant reaches the promotion bar
+
+Zip renamed `thin_gate_results_session4_screen.zip` (browser name was `thin_gate_results (3).zip`). Session
+ran 20:18 UTC Sep 20 to 06:10 UTC Sep 21, 9.9 h; torch 2.10.0+cu128, transformers 5.0.0, datasets 5.0.0 as
+before. Checks ok: `tests.py` 11/11 on the GPU, the posthoc smoke and all five new-path train smokes ok. All 13
+screen runs finished `[ok]`, 83-88 min each, 57k-60k tok/s, peak memory 2.2 GB; no nan, inf or overflow in any
+log. The screen used the whole launch window (the last run started at 04:43, 8.4 h in, and the deadline is 9.3 h),
+so **none of the 12 remaining `main_S` runs started**: 12 `[skip]` lines, as designed. 63 files in the zip; the
+14 Exp. A and 21 earlier Exp. B files came back byte-identical; the 13 new files are committed in
+`results/train/`.
+
+Two repo notes from the take-in. (1) The remote had a commit made on the evening of 2026-09-20 ("Rewrite
+README with Exp. A results and remove planning notes") that neither local checkout held; it deleted this file,
+`HANDOFF.md` and `PLAN.md`. Decision (author): keep the new README, restore the three notes files, carry the
+go/no-go text into `HANDOFF.md`. (2) Two checkouts of the repo exist on the Mac; work now happens in
+`~/thin-gate-glu`, and `~/Desktop/thin-gate-glu` (which holds the `.venv`) is behind and must be pulled or
+removed.
+
+**Screen results, seed 0, sorted by final val loss.** Reference: shrunk r4 s0 = 4.1043, its last three evals
+(steps 4250 / 4500 / 4577) 4.1150 / 4.1061 / 4.1043; dense mean 4.0942, dense seed range 0.029.
+
+| Arm | MLP params | final | last 3 evals | gap to shrunk s0 | rule outcome |
+|---|---|---|---|---|---|
+| thin gate r4 spectral nowd | 5,529,600 | 4.1127 | 4.1232 / 4.1142 / 4.1127 | +0.008 | drop |
+| bottleneck norm gate r4 | 5,530,176 | 4.1140 | 4.1241 / 4.1160 / 4.1140 | +0.010 | drop |
+| thin gate r4 spectral | 5,529,600 | 4.1146 | 4.1255 / 4.1168 / 4.1146 | +0.010 | drop |
+| grouped gate g4 | 5,515,776 | 4.1175 | 4.1277 / 4.1194 / 4.1175 | +0.013 | drop |
+| grouped up g4 (control) | 5,515,776 | 4.1225 | 4.1327 / 4.1244 / 4.1225 | +0.018 | control |
+| warm gate r4 f25 (bridge) | 5,529,600 | 4.1233 | 4.1334 / 4.1252 / 4.1233 | +0.019 | not matched |
+| monarch gate b2 narrow | 5,511,168 | 4.1243 | 4.1350 / 4.1267 / 4.1243 | +0.020 | drop |
+| thin gate r4 halfwd | 5,529,600 | 4.1252 | 4.1348 / 4.1267 / 4.1252 | +0.021 | drop |
+| grouped down g4 (control) | 5,515,776 | 4.1259 | 4.1356 / 4.1274 / 4.1259 | +0.022 | control |
+| bottleneck gate r4 | 5,529,600 | 4.1276 | 4.1382 / 4.1297 / 4.1276 | +0.023 | drop |
+| thin gate r4 nowd | 5,529,600 | 4.1288 | 4.1390 / 4.1308 / 4.1288 | +0.025 | drop |
+| warm gate r4 f10 (bridge) | 5,529,600 | 4.1308 | 4.1401 / 4.1320 / 4.1308 | +0.027 | not matched |
+| monarch gate b4 | 5,529,600 | 4.1314 | 4.1410 / 4.1331 / 4.1314 | +0.027 | drop |
+
+**Decision rule applied (2026-09-20 night entry): all 13 dropped.** No variant has a final loss at or below
+4.100, none is at or below 4.1043 (so no arm earns a seed-1 run), and none is below shrunk at any of the last
+three evals. The best, spectral init without factor decay, is 0.008 above shrunk s0 and 0.013 above the
+promotion bar.
+
+**Stated plainly:**
+
+- The 13 arms span 4.1127 to 4.1314, a spread of 0.019, smaller than the dense seed range of 0.029. One seed
+  cannot rank these variants against each other; what the screen can say is that none reaches the bar.
+- **The thin-gate deficit is not an optimizer artifact.** Spectral init (4.1146) and spectral without factor
+  decay (4.1127) land where thin gate seeds 1 and 2 already are (4.1145, 4.1151); dropping decay alone (4.1288)
+  or halving it (4.1252) is on the level of seed 0 (4.1250). Init and decay move the number inside the arm's
+  own seed range and no further.
+- **Grouped selection reproduces the thin-projection order, gate < up < down** (4.1175 < 4.1225 < 4.1259), and
+  all three sit above shrunk. Fewer gate *units* is not cheaper than fewer gate *dimensions* at this scale.
+- **Monarch, the candidate with the best prior, is last** (4.1314 with 4 blocks; 4.1243 with 2 blocks and
+  narrower d_ff). Full-rank structure at the same parameter count does not rescue the gate here.
+- The nonlinear bottleneck is 4.1276 plain and 4.1140 with a norm, second best, but still 0.010 above shrunk.
+- **Warm start (the Exp. A / B bridge):** thinning the dense gate to whitened rank 96 at 25% of training cost
+  4.5927 -> 4.7745 at the swap (step 1144) and ended at 4.1233; at 10% (step 457) 5.3210 -> 5.4212, ending at
+  4.1308. Both end worse than the from-scratch thin gate mean (4.1182) despite about 1% more train compute, and
+  both are far above shrunk. Truncating a partly trained gate and continuing does not beat training thin from
+  step 0. Reported in its own table (`tables/warm_start.tex`), never in the matched one.
+- Against dense (mean 4.0942, range 0.029): five screen arms are within the range on the mean (spectral nowd,
+  bottleneck norm, spectral, grouped gate, grouped up), the other eight are outside it. Every one is worse than
+  shrunk r4 at the same parameter count, which is the comparison that matters.
+
+**What this settles.** The "which structure on the gate" paper is off the table: five families of gate
+structure at the shrunk_r4 budget, chosen to give the thesis its best chance, all lose to a plain narrower
+dense block. The two experiments together still say what session 3 said, now with the alternatives closed
+off: post-hoc rank tolerance (Exp. A, gate most tolerant) does not predict from-scratch trainability (Exp. B,
+gate = up, both behind shrunk), and neither structural nor optimization changes to the gate close the gap.
+
+Options for the Sep 27 decision, updated (author's call):
+
+1. **Contrast paper** (the only option the data now support; recommended by the assistant, not decided):
+   Exp. A, B, C kept; retitle; Exp. B's headline becomes the rank sweep of all three projections at three
+   seeds, which needs `thin_up_r2/r8` and `thin_down_r2/r8` in `grid.py` (12 runs) on top of the 12
+   remaining `main_S` runs. The screen becomes a short "alternatives tried" table with the honest caveat that
+   it is one seed.
+2. Finish `main_S` first (session 5, 12 runs, about 8.5 h on two T4s, fits one commit), then decide. This is
+   needed under option 1 anyway, so session 5 is `--run main_S` either way.
+3. No-go. Still not recommended: a controlled negative with 13 screened alternatives is publishable under
+   rule 2.
+
+`plot.py` now writes warm-started arms to `tables/warm_start.tex` (swap step, val before and after, final)
+and keeps them out of `training.pdf` / `tables/training.tex`, which are regenerated with 22 matched arms and
+committed. Nothing from sessions 3 or 4 is in `paper/main.tex` yet.
