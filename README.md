@@ -1,16 +1,22 @@
 # Thin-gate GLU: do GLU gates need full rank?
 
-Code and paper for a submission to CPAL 2027 (Conference on Parsimony and Learning, Proceedings Track). Abstract registration is due Nov 23, 2026, the paper Dec 5, 2026. The project started out aimed at ICLR 2027 and moved when that abstract deadline went by unregistered.
+Code and paper for a submission to CPAL 2027 (Conference on Parsimony and Learning, Proceedings Track).
 
-[PLAN.md](PLAN.md) is the original plan: the ideas considered, the abstract, title options and the go/no-go criteria. Its 8-day schedule is out of date; the current one is in [HANDOFF.md](HANDOFF.md). [related.md](related.md) is the reading list. [SETUP_PC.md](SETUP_PC.md) describes the local GPU machine, which is no longer used.
+A SwiGLU block computes `down( silu(gate x) * (up x) )`. The gate decides which hidden units are active; the up and down projections carry the content that gets written back. The three matrices have the same shape, so the question "is selection cheaper than content?" has a controlled test: restrict one projection at a time to the same rank, so the parameter savings are identical, and measure which restriction the model tolerates best.
 
-## Hypothesis
+## Results so far (training-free truncation)
 
-A SwiGLU block computes `down( silu(gate x) * (up x) )`. The gate decides which hidden units are active; the up and down projections carry the content that gets written back. If that split is real, the gate should survive a low-rank factorization better than up or down do. We don't know yet whether it does. The experiments are built so that either answer makes a paper.
+Each projection type was truncated to rank `r` in every layer of seven open pretrained models (SmolLM2 135M/360M/1.7B, Qwen2.5 0.5B/1.5B, TinyLlama 1.1B, OLMo-2 1B), at six rank fractions from `r/d = 3/4` down to `1/16`, using both plain SVD and activation-aware (whitened) SVD, and scored by WikiText-2 perplexity. Full tables are in `paper/tables/`, generated from `results/posthoc/*.json` by `plot.py`.
 
-## Machines
+- **The gate is far more compressible than the up-projection.** Under whitened SVD, truncating the gate costs less perplexity than truncating the up-projection to the same rank in 41 of 42 model-rank settings. The one exception (SmolLM2-360M at `r/d = 1/4`) is within a fraction of a percent. Plain SVD gives the same ordering in 37 of 42.
+- **The advantage depends on rank.** At `r/d = 3/4` the gate is the best projection to shrink in all 7 models, and at `r/d = 1/2` in 6 of 7 (in Qwen2.5-0.5B the down-projection is ahead by about 3%). Below `r/d = 1/4` the down-projection overtakes the gate in 5 of 7 models.
+- **Plain SVD is not usable below `r/d = 3/4`** for any projection; the whitened variant is the one the rest of the paper builds on.
 
-The MacBook is for editing code, writing the paper, plotting, and `--smoke` checks. Every GPU experiment runs on Kaggle's free T4s (see "Running on Kaggle" below). The local PC sits this one out.
+So the hypothesis holds in part: the gate is cheaper than the up-projection throughout, and cheaper than the down-projection at moderate rank. Pretraining from scratch (Exp. B) and post-truncation healing (Exp. C) are in progress.
+
+## Setup
+
+Code is edited and plotted on a laptop; every GPU experiment runs on Kaggle's free T4s (see "Running on Kaggle" below). Exp. A runs in float32; Exp. B and C use float16 with loss scaling. Each result file records its precision and GPU.
 
 ## Files
 
@@ -21,15 +27,15 @@ The MacBook is for editing code, writing the paper, plotting, and `--smoke` chec
 | `heal.py`, `run_heal.sh` | Exp. C: truncate a pretrained model, then train only the new factors |
 | `bench.py` | measured tokens/s and memory for each arm |
 | `plot.py` | turns results/*.json into `paper/figures/*.pdf` and `paper/tables/*.tex` |
-| `tests.py` | correctness tests, to run after every code change |
+| `tests.py` | 11 correctness tests (exact full-rank reconstruction, parameter/FLOP counts, causal masking) |
 | `cloud_run.py`, `make_cloud_notebook.py` | run the experiments on a free cloud GPU from one self-contained notebook |
-| `paper/` | the paper (`main.tex`); the ICLR 2027 style file is a placeholder until CPAL publishes its template (same 9-page main text) |
+| `paper/` | the paper (`main.tex`), figures and tables; the ICLR style file is a placeholder until CPAL publishes its template |
 
 Every script accepts `--help`. Each also accepts `--smoke`, which runs a toy check in under a minute and downloads nothing.
 
-## Running on Kaggle (the route in use since 2026-09-17)
+## Running on Kaggle
 
-`python make_cloud_notebook.py` writes `cloud_notebook.ipynb`. The notebook carries its own copy of the code, so the private repo never has to be shared. Upload it to Kaggle (Accelerator: GPU T4 x2, Internet: on, notebook private), use Save Version, then Save & Run All. When it finishes, download `thin_gate_results.zip` from the Output tab and unzip it into this folder.
+`python make_cloud_notebook.py` writes `cloud_notebook.ipynb`. The notebook carries its own copy of the code. Upload it to Kaggle (Accelerator: GPU T4 x2, Internet: on, notebook private), use Save Version, then Save & Run All. When it finishes, download `thin_gate_results.zip` from the Output tab and unzip it into this folder.
 
 Kaggle sessions start empty and stop after 12 hours, so the work is split into sessions. Each new notebook carries the finished results of the earlier ones inside it, and the runner skips whatever is already done:
 
@@ -47,16 +53,6 @@ A T4 has no native bfloat16, so Exp. A runs in float32 on every model and Exp. B
 Check the baseline before anything else. The "baseline perplexity" printed for SmolLM2-135M on wikitext-2 should be in the tens, which is normal for a 135M model. Hundreds or thousands means the evaluation code is broken, and every later number depends on it.
 
 Then work out the time budget. The throughput check prints tokens per second, and one size-S run takes `300e6 / tok_per_s` seconds. If that is more than about 1.5 hours, lower `TOKENS["S"]` in `grid.py` before starting the grid. Once a grid has started, the token budget stays the same for every arm.
-
-### Go or no-go (decide by 6 pm Sunday Sep 27)
-
-Look at `paper/figures/posthoc_*.pdf` and at the pilot runs. The noise floor is |S_dense_s0 − S_dense_s1| in final validation loss. A gap smaller than that is not a result.
-
-- Go if, in most models, the gate curve sits clearly below the up and down curves at equal rank. The whitened SVD figure is the one that counts. Also go if thin_gate_r4 lands within the noise floor of dense while thin_up_r4 and thin_down_r4 are clearly worse, or if thin_gate_r4 beats shrunk_r4.
-- Pivot if a different projection turns out to be the cheap one. The paper stays the same and the method gets renamed. The title and abstract stay true in that case.
-- No-go if all three projections behave alike and low rank simply loses. Then withdraw or send the negative result to a workshop. Don't stretch the claims to keep the submission alive.
-
-After the go, the remaining sessions are `main_S`, `main_M`, then `heal,bench`, and `lr` if quota allows. Zero-shot accuracy for a converted or truncated model is optional: see `lm_eval --help` for tasks such as `arc_easy,hellaswag,piqa`, and only add it once experiments A to C are finished. Experiments freeze on Nov 8. Then run `python plot.py` and write.
 
 ## Commands on a local GPU (reference only)
 
@@ -91,7 +87,7 @@ python grid.py --stage lr --run          # if time: shows the comparison doesn't
 2. Every arm gets the same data order, token budget, learning-rate schedule and seeds. The method never gets more tuning than the baseline.
 3. Report mean ± std over seeds and compare each gap to the spread between dense seeds. A difference seen in one seed could be noise.
 4. Report measured tokens/s and memory, even if the low-rank arms turn out no faster on this GPU.
-5. Log failed and surprising runs in `notes.md` with the date. It makes reviewer questions much easier to answer.
+5. Log failed and surprising runs with the date, so reviewer questions are easy to answer.
 6. State the scale limits in the abstract, the introduction and the limitations section. Don't extrapolate to large models.
 7. Read every paper you cite, and export its BibTeX from the source page. Keep `related.md` current.
 8. Keep names, usernames, repo URLs and machine names out of the PDF, the code zip and the result files. The JSONs record only the GPU model.
