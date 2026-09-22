@@ -12,6 +12,8 @@ Stages follow the day-by-day plan:
     main_M  Day 4-5: the five key arms at size M, seeds 0-1
     big_L   stretch: dense vs thin-gate at size L, one seed
     screen  size S, seed 0: variants that might beat shrunk_r4 at the same parameter count (see screen_arms)
+    screen2 size S, seeds 0-2: gates that are cheap in a different way (tied, thin+tied, shared) plus a
+            starved-budget pair; every run carries a reference curve for the early-kill rule (see screen2_arms)
 
 Arms (r = rank, d = d_model, F = default d_ff):
     dense            standard SwiGLU
@@ -30,6 +32,13 @@ Screening arms (all matched to thin_gate_r4 / shrunk_r4):
     bottleneck_{,norm_}gate_r4  thin gate with a silu (and RMSNorm) between the two factors
     warm_gate_r4_f{10,25}       dense gate for the first 10% / 25% of steps, then thinned to rank d/4 (not a
                                 matched from-scratch arm: it costs a little more training compute)
+
+Screen 2 (matched to shrunk_r4 unless noted):
+    tied_gate                   the gate IS the up-projection: h = silu(z) * z, zero gate parameters, d_ff 1200
+    tied_gate_relu              same with relu: h = relu(z)^2 (Primer's squared ReLU)
+    thin_tied_gate_r4           rank d/4 gate plus a per-unit scale times the up pre-activation, d_ff 1024
+    shared_gate                 one dense gate matrix for all layers, d_ff widened to 1104
+    shrunk_w400 / tied_gate_w600   the starved-budget pair (460,800 params/layer each)
 """
 
 import argparse
@@ -88,14 +97,38 @@ def screen_arms(size, K=4):
     }
 
 
+def screen2_arms(size, K=4):
+    """Gates that are cheap in a different way than low rank, at the parameter count of shrunk_rK, plus a
+    starved-budget pair. Priority order; every arm runs at seeds 0-2 with the early-kill rule."""
+    L, _, d, F = SIZES[size]
+    r = d // K
+    thin_params = 2 * d * F + r * (d + F)
+    Ft = round_to(thin_params / (2 * d), 8)                      # tied: no gate parameters at all
+    Fs = round_to(thin_params / (d * (2 + 1 / L)), 8)            # shared: one gate matrix per L layers
+    Fs -= Fs % 8
+    return {
+        "tied_gate": {"d_ff": Ft, "gate_tie": "up"},
+        "tied_gate_relu": {"d_ff": Ft, "gate_tie": "up", "gate_act": "relu"},
+        f"thin_tied_gate_r{K}": {"gate_rank": r, "gate_tie": "up"},
+        "shared_gate": {"d_ff": Fs, "gate_shared": 1},
+        "shrunk_w400": {"d_ff": 400},                             # starved budget: 3 * d * 400
+        "tied_gate_w600": {"d_ff": 600, "gate_tie": "up"},        # the same budget, gate tied, 1.5x wider
+    }
+
+
 def mlp_params(size, arm):
     """MLP parameters per layer for an arm dict (the keys are train.py flags)."""
-    _, _, d, F = SIZES[size]
+    L, _, d, F = SIZES[size]
     F = arm.get("d_ff", F)
     total = 0
     for proj, (n_in, n_out) in (("gate", (d, F)), ("up", (d, F)), ("down", (F, d))):
         r, g, nb = arm.get(f"{proj}_rank", 0), arm.get(f"{proj}_groups", 1), arm.get(f"{proj}_monarch", 0)
-        if r:
+        if proj == "gate" and arm.get("gate_tie") == "up":
+            total += r * (n_in + n_out) + n_out if r else 0      # optional rank-r term plus a per-unit scale
+        elif proj == "gate" and arm.get("gate_shared"):
+            assert (n_in * n_out) % L == 0, "shared gate: d * d_ff must divide by the layer count"
+            total += n_in * n_out // L                           # one matrix, charged evenly to the layers
+        elif r:
             total += r * (n_in + n_out) + (r if arm.get("bottleneck") == "norm_silu" else 0)
         elif nb:
             total += n_in * n_in // nb + n_in * n_out // nb          # two block-diagonal factors
@@ -134,6 +167,13 @@ def runs_for(stage):
     elif stage == "screen":
         arms = screen_arms("S")
         add("S", list(arms), [0], arms=arms)      # priority order: the launch deadline drops the tail
+    elif stage == "screen2":
+        arms = screen2_arms("S")
+        for seed in (0, 1, 2):                    # round 1 = every arm at seed 0, then seeds 1 and 2
+            for a in arms:
+                ref = None if a == "shrunk_w400" else ("S_shrunk_w400" if a == "tied_gate_w600" else "S_shrunk_r4")
+                extra = {"ref_json": f"results/train/{ref}_s{seed}.json"} if ref else {}
+                out.append((f"S_{a}_s{seed}", "S", arms[a], seed, extra))
     else:
         sys.exit(f"unknown stage {stage}")
     return out
@@ -159,7 +199,7 @@ if __name__ == "__main__":
         for size in SIZES:
             base = mlp_params(size, {})
             print(f"\nsize {size}: MLP parameters per layer (dense = {base:,})")
-            for name, arm in {**arms_for(size, (2, 4, 8)), **screen_arms(size)}.items():
+            for name, arm in {**arms_for(size, (2, 4, 8)), **screen_arms(size), **screen2_arms(size)}.items():
                 p = mlp_params(size, arm)
                 print(f"  {name:26s} {p:>10,}  ({100 * p / base:5.1f}% of dense)  {arm}")
         sys.exit()

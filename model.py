@@ -41,6 +41,10 @@ class GPTConfig:
     gate_monarch: int = 0        # nb > 0: the gate is a Monarch matrix with nb blocks (full rank, few parameters)
     lowrank_init: str = "balanced"   # "balanced" (random factors) or "spectral" (SVD of a random dense init)
     bottleneck: str = "linear"       # what sits between the two factors: "linear", "silu" or "norm_silu"
+    gate_tie: str = "none"           # "up": the gate reuses the up-projection's weights (zero gate parameters);
+                                     # with gate_rank > 0 a rank-r term and a per-unit scale are added to it
+    gate_act: str = "silu"           # activation applied to the gate pre-activation: "silu" or "relu"
+    gate_shared: int = 0             # 1: one dense gate matrix is shared by every layer
     rope_base: float = 10000.0
     init_std: float = 0.02
 
@@ -160,16 +164,29 @@ def _expand_groups(t, g):
 
 
 class SwiGLU(nn.Module):
-    def __init__(self, cfg: GPTConfig):
+    def __init__(self, cfg: GPTConfig, shared_gate=None):
         super().__init__()
         d, F_, std = cfg.d_model, cfg.d_ff, cfg.init_std
         assert F_ % cfg.gate_groups == 0 and F_ % cfg.up_groups == 0 and F_ % cfg.down_groups == 0
         assert sum([cfg.gate_rank > 0, cfg.gate_groups > 1, cfg.gate_monarch > 0]) <= 1, "one gate structure at a time"
         assert not (cfg.up_rank > 0 and cfg.up_groups > 1) and not (cfg.down_rank > 0 and cfg.down_groups > 1)
+        assert cfg.gate_tie in ("none", "up") and cfg.gate_act in ("silu", "relu")
+        if cfg.gate_tie != "none" or cfg.gate_shared:
+            assert cfg.gate_groups == 1 and cfg.gate_monarch == 0 and cfg.up_rank == 0 and cfg.up_groups == 1, \
+                "a tied or shared gate needs a plain up-projection and no other gate structure"
+            assert not (cfg.gate_tie != "none" and cfg.gate_shared), "tied and shared are different arms"
         self.gate_groups, self.up_groups, self.down_groups = cfg.gate_groups, cfg.up_groups, cfg.down_groups
+        self.tied, self.act = cfg.gate_tie == "up", cfg.gate_act
         # GPT-2 style: shrink the init of layers that write into the residual stream
         down_std = std / math.sqrt(2 * cfg.n_layer)
-        if cfg.gate_monarch:
+        if self.tied:
+            # the gate is the up-projection itself: h = act(z) * z with z = up(x). With a rank, a low-rank
+            # term and a per-unit scale are added: g = B A x + tie_scale * z  (tie_scale starts at 1)
+            self.gate = make_linear(d, F_, cfg.gate_rank, std, cfg.lowrank_init, cfg.bottleneck) if cfg.gate_rank else None
+            self.tie_scale = nn.Parameter(torch.ones(F_)) if cfg.gate_rank else None
+        elif shared_gate is not None:
+            self.gate = shared_gate                     # the same nn.Linear object in every layer
+        elif cfg.gate_monarch:
             self.gate = MonarchLinear(d, F_, cfg.gate_monarch, std)
         else:
             self.gate = make_linear(d, F_ // cfg.gate_groups, cfg.gate_rank, std, cfg.lowrank_init, cfg.bottleneck)
@@ -177,9 +194,14 @@ class SwiGLU(nn.Module):
         self.down = make_linear(F_ // cfg.down_groups, d, cfg.down_rank, down_std, cfg.lowrank_init, cfg.bottleneck)
 
     def forward(self, x):
+        if self.tied:
+            z = self.up(x).float()                      # float32: z * act(z) is quadratic and float16 tops out at |z| = 256
+            g = z if self.gate is None else self.gate(x).float() + self.tie_scale * z
+            act = F.silu if self.act == "silu" else F.relu
+            return self.down((act(g) * z).to(x.dtype))
         g = _expand_groups(self.gate(x), self.gate_groups)
         u = _expand_groups(self.up(x), self.up_groups)
-        h = F.silu(g) * u
+        h = F.silu(g) * u if self.act == "silu" else F.relu(g) * u
         if self.down_groups > 1:      # average g neighbouring hidden units so the residual write keeps its scale
             h = h.reshape(*h.shape[:-1], h.shape[-1] // self.down_groups, self.down_groups).mean(-1)
         return self.down(h)
@@ -211,12 +233,12 @@ class Attention(nn.Module):
 
 
 class Block(nn.Module):
-    def __init__(self, cfg: GPTConfig):
+    def __init__(self, cfg: GPTConfig, shared_gate=None):
         super().__init__()
         self.norm1 = nn.RMSNorm(cfg.d_model)
         self.attn = Attention(cfg)
         self.norm2 = nn.RMSNorm(cfg.d_model)
-        self.mlp = SwiGLU(cfg)
+        self.mlp = SwiGLU(cfg, shared_gate)
 
     def forward(self, x, cos, sin):
         x = x + self.attn(self.norm1(x), cos, sin)
@@ -230,7 +252,8 @@ class GPT(nn.Module):
         self.cfg = cfg
         self.embed = nn.Embedding(cfg.vocab_size, cfg.d_model)
         nn.init.normal_(self.embed.weight, std=cfg.init_std)
-        self.blocks = nn.ModuleList([Block(cfg) for _ in range(cfg.n_layer)])
+        shared_gate = make_linear(cfg.d_model, cfg.d_ff, 0, cfg.init_std) if cfg.gate_shared else None
+        self.blocks = nn.ModuleList([Block(cfg, shared_gate) for _ in range(cfg.n_layer)])
         self.norm = nn.RMSNorm(cfg.d_model)
         # The output head is tied to the input embedding (no extra parameters).
 
@@ -258,7 +281,8 @@ def count_params(model: GPT):
     """Parameter counts, split the way the paper reports them."""
     total = sum(p.numel() for p in model.parameters())
     embed = model.embed.weight.numel()
-    mlp = sum(p.numel() for b in model.blocks for p in b.mlp.parameters())
+    # a shared gate appears in every block's .parameters(); count each tensor once
+    mlp = sum(p.numel() for p in {id(p): p for b in model.blocks for p in b.mlp.parameters()}.values())
     attn = sum(p.numel() for b in model.blocks for p in b.attn.parameters())
     return {"total": total, "embedding": embed, "non_embedding": total - embed, "mlp": mlp, "attn": attn}
 

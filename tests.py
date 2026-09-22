@@ -6,7 +6,12 @@ If any of these fail, do not trust experiment numbers until it is fixed.
 
 import torch
 
-from grid import arms_for, mlp_params, screen_arms
+import json
+import os
+import subprocess
+import sys
+
+from grid import arms_for, mlp_params, screen2_arms, screen_arms
 from model import GPT, GPTConfig, LowRankLinear, MonarchLinear, SwiGLU, _expand_groups, count_params
 from posthoc_truncate import factorize
 from train import SIZES, thin_gates
@@ -59,7 +64,7 @@ def test_param_counts_match_formula():
     for size, (L, H, d, F) in SIZES.items():
         if size == "L":
             continue                                    # skip the big one to keep the test fast
-        for name, arm in {**arms_for(size, (4,)), **screen_arms(size)}.items():
+        for name, arm in {**arms_for(size, (4,)), **screen_arms(size), **screen2_arms(size)}.items():
             counted = count_params(GPT(config_for(arm, L, H, d, F)))["mlp"]
             assert counted == L * mlp_params(size, arm), f"{size}/{name}: {counted} != formula"
 
@@ -79,6 +84,11 @@ def test_matched_arms_are_matched():
         for name, arm in screen_arms(size).items():
             gap = abs(mlp_params(size, arm) - thin) / thin
             assert gap < 0.015, f"{size}/{name} differs from thin gate by {100 * gap:.2f}%"
+        s2 = screen2_arms(size)
+        for name in ("tied_gate", "tied_gate_relu", "thin_tied_gate_r4", "shared_gate"):
+            gap = abs(mlp_params(size, s2[name]) - thin) / thin
+            assert gap < 0.015, f"{size}/{name} differs from thin gate by {100 * gap:.2f}%"
+        assert mlp_params(size, s2["shrunk_w400"]) == mlp_params(size, s2["tied_gate_w600"]), "starved pair not matched"
 
 
 def test_model_is_causal():
@@ -159,6 +169,70 @@ def test_thin_swap_is_exact_at_full_rank_and_keeps_optimizer_state():
     loss.backward()
     opt.step()
 
+
+
+def test_tied_gate_forward():
+    """A tied gate is the up-projection: h = act(z) * z, and it owns no gate parameters."""
+    torch.manual_seed(0)
+    L, H, d, F_ = 2, 2, 16, 24
+    x = torch.randn(3, 5, d)
+    for act, fn in (("silu", torch.nn.functional.silu), ("relu", torch.relu)):
+        m = SwiGLU(GPTConfig(n_layer=L, n_head=H, d_model=d, d_ff=F_, gate_tie="up", gate_act=act))
+        assert m.gate is None and m.tie_scale is None
+        assert {n for n, _ in m.named_parameters()} == {"up.weight", "down.weight"}
+        z = x @ m.up.weight.T
+        want = (fn(z) * z) @ m.down.weight.T
+        assert torch.allclose(m(x), want, atol=1e-6), f"tied {act} forward differs from the hand computation"
+    assert torch.allclose(torch.relu(z) * z, torch.relu(z) ** 2), "the relu tie is Primer's squared ReLU"
+
+
+def test_thin_tied_gate_reduces_to_thin_gate():
+    """thin+tied with the per-unit scale at zero equals the plain thin gate built from the same factors."""
+    torch.manual_seed(0)
+    L, H, d, F_, r = 2, 2, 16, 24, 4
+    tied = SwiGLU(GPTConfig(n_layer=L, n_head=H, d_model=d, d_ff=F_, gate_rank=r, gate_tie="up"))
+    plain = SwiGLU(GPTConfig(n_layer=L, n_head=H, d_model=d, d_ff=F_, gate_rank=r))
+    plain.load_state_dict({k: v for k, v in tied.state_dict().items() if k != "tie_scale"})
+    assert tied.tie_scale.shape == (F_,) and torch.all(tied.tie_scale == 1), "the scale starts at 1"
+    x = torch.randn(3, 5, d)
+    with torch.no_grad():
+        tied.tie_scale.zero_()
+    assert torch.allclose(tied(x), plain(x), atol=1e-6), "scale 0 must give the plain thin gate"
+    assert sum(p.numel() for p in tied.parameters()) == sum(p.numel() for p in plain.parameters()) + F_
+
+
+def test_shared_gate_is_one_module():
+    L, H, d, F_ = 3, 2, 16, 24
+    model = GPT(GPTConfig(n_layer=L, n_head=H, d_model=d, d_ff=F_, gate_shared=1, seq_len=32))
+    gates = [b.mlp.gate for b in model.blocks]
+    assert all(g is gates[0] for g in gates), "every layer must hold the same gate object"
+    assert sum(1 for p in model.parameters() if p is gates[0].weight) == 1, "listed once in parameters()"
+    counted = count_params(model)["mlp"]
+    assert counted == L * 2 * d * F_ + d * F_, f"shared gate counted wrongly: {counted}"
+    x = torch.randint(0, 512, (2, 8))
+    logits = model(x)
+    assert logits.shape == (2, 8, model.cfg.vocab_size)
+    logits.sum().backward()
+    assert gates[0].weight.grad is not None, "the shared gate receives gradient from every layer"
+
+
+def test_kill_rule():
+    """A smoke run with a reference whose margin is impossible to meet stops at the kill step and writes a
+    JSON with `killed` and no `final_val_loss`, which plot.py then ignores."""
+    os.makedirs("results/smoke", exist_ok=True)
+    ref = "results/smoke/_test_ref.json"
+    with open(ref, "w") as f:
+        json.dump({"name": "ref", "log": {"val": [{"step": 10, "loss": 0.0}, {"step": 20, "loss": 0.0}]}}, f)
+    cmd = [sys.executable, "train.py", "--smoke", "--name", "_test_killed", "--ref_json", ref,
+           "--kill_steps", "10:0.5", "--no_compile"]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    assert r.returncode == 0, r.stdout[-2000:] + r.stderr[-2000:]
+    with open("results/smoke/_test_killed.json") as f:
+        out = json.load(f)
+    assert "killed" in out and "final_val_loss" not in out, "a killed run must not report a final loss"
+    assert out["killed"]["step"] == 10 and out["killed"]["ref"] == "ref"
+    assert out["log"]["val"][-1]["step"] == 10, "training must stop right after the kill eval"
+    assert "KILLED at step 10" in r.stdout
 
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]

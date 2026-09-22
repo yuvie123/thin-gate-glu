@@ -820,3 +820,78 @@ content depends on the decision.
 
 `training.pdf` and `tables/training.tex` are regenerated (22 matched arms, now 11 of them at three seeds) and
 committed. Nothing from sessions 3-5 is in `paper/main.tex` yet.
+
+### 2026-09-22, evening: screen 2 built, gates that are cheap in a different way (decision, author)
+
+The author asked for a variant most likely to beat `shrunk_r4`, with all the testing that can be done before
+it runs. What can and cannot be promised, stated first.
+
+**Why the room is small.** The completed grid gives the loss-vs-width curve of the dense block at size S:
+744 -> 4.1054, 800 -> 4.1070, 920 -> 4.0942, 1024 -> 4.0942. It is flat above about 900 and rises by only
+0.013 down to 800. A cheaper gate can only win by reinvesting its savings in width, so at the shrunk_r4
+budget the ceiling is about 0.013 (dense level) against a 3-seed noise of about 0.008. **No design can be
+guaranteed to beat shrunk here.** The thin gates lost because a rank-r gate confines every unit's key to one
+r-dim subspace (rank 192 costs 0.012, 96 costs 0.024, 48 costs 0.038 against a dense gate at the same
+width), and width buys only 0.006 per 100 units. So the candidates below make the gate cheap without making
+it low-rank: every unit keeps a full-rank key.
+
+**Candidates (stage `screen2`, size S, seeds 0-2, priority order), with the assistant's prior of beating
+shrunk r4 on the 3-seed paired mean, written down before any run:**
+
+| Arm | Gate | d_ff | MLP params | Prior |
+|---|---|---|---|---|
+| tied_gate | the up-projection is the gate: h = silu(z) z, z = Ux; zero gate parameters | 1200 | 921,600 | ~40% |
+| tied_gate_relu | same with relu: h = relu(z)^2, which is Primer's squared ReLU | 1200 | 921,600 | ~40% (correlated) |
+| thin_tied_gate_r4 | g = BAx + alpha * z, rank 96 plus a per-unit scale (init 1): thin gate with a free full-rank self term | 1024 | 922,624 | ~35% |
+| shared_gate | one dense gate matrix for all 6 layers; the per-layer RMSNorm scale gives each layer a diagonal adaptation of the shared key | 1104 | 918,528 | ~25% |
+| shrunk_w400 vs tied_gate_w600 | the starved-budget pair, 460,800 params/layer each: where width is scarce the zero-parameter gate at 1.5x width has real room | 400 / 600 | 460,800 | ~65% that tied wins the pair |
+
+Roughly 55% that at least one r4-budget arm beats shrunk on the paired mean, roughly 30% that one clears it
+by more than the noise band. Literature for and against the tied gate: Shazeer 2020 (GLU variants; a GLU at
+2/3 width beats a plain FFN at equal parameters) argues against; So et al. 2021 (Primer; squared ReLU is the
+strongest non-gated activation) and small-scale speedrun practice argue for. Both are in `related.md` as
+must-reads *if* a tied gate wins; nothing is cited before it is read (rule 1). Dropped on purpose: tying the
+gate to the down projection (down is the fragile projection), any thinner gate plus width (the data above),
+MoE and sharing-for-depth (off-thesis).
+
+**Early-kill rule, backtested on the 41 finished non-reference runs** (paired with the same-seed shrunk r4
+curve; eval every 250 steps, 4577 steps per run):
+
+| eval step | 500 | 1000 | 1250 | 1500 | 1750 | 2000 | 2500 | 3000 | 4000 |
+|---|---|---|---|---|---|---|---|---|---|
+| runs whose gap has the wrong sign vs final | 12 | 10 | 3 | 6 | 1 | 2 | 1 | 2 | 1 |
+
+Every wrong sign after step 1250 belongs to a run that ends within 0.005 of shrunk. At step 2000 (44% of
+training, 37 of 85 minutes) the gap is within 0.010 of its final value for every arm that ends within 0.03
+of shrunk. Rule: **stop at step 2000 if the run is more than 0.010 behind the same-seed reference, at step
+3000 if more than 0.008 behind.** In the backtest this has zero false kills (no run that ended at or below
+shrunk would have been stopped; the closest call is reinvest s0 at +0.011 at step 2000 with a final gap of
+-0.0004, which is why the margin is 0.010 and not less) and catches every run that ends at +0.017 or worse.
+Killed runs write a JSON with `killed` and no `final_val_loss`; `plot.py` ignores them, the notebook carries
+them so they are not rerun, and the runner does not start seeds 1-2 of an arm whose seed 0 was killed. The
+early steps (500: 12 wrong signs out of 41) are also the reason no short CPU pilot is used as evidence:
+1-2% of the token budget ranks arms wrongly about a third of the time.
+
+**Tested before upload (Mac, CPU):** `tests.py` 15/15 (the 11 old tests plus: tied forward equals
+act(Ux) Ux by hand and the relu tie equals relu(z)^2; thin+tied with the scale at 0 equals the plain thin gate;
+the shared gate is one module counted once and receives gradient from every layer; a smoke run with an
+impossible reference is killed at step 10 and writes the right JSON). The baseline smoke's validation curve is
+bit-identical to the previous commit's (`6.25308, 6.2524`), so every old arm is unchanged. All four new
+paths train in the smoke; the largest |Ux| seen is 0.75, and every run now records `max_up_preactivation`
+because the tied product z act(z) is computed in float32 and cast back (float16 would overflow at |z| = 256).
+`grid.py --table` gives 921,600 / 921,600 / 922,624 / 918,528 / 460,800 / 460,800. The Kaggle check step
+runs all five new smokes compiled on the GPU (including a kill-rule smoke that must fire) before any real
+run.
+
+**Promotion rule, fixed now:** an arm *wins* if its paired 3-seed mean gap to shrunk (same budget) is at or
+below -0.005 with all three pairs negative; *ties* if the mean is within 0.005; *loses* otherwise. Rule 4
+applies: seed 0 alone is a trigger, not an effect. The starved pair is reported as its own figure, never in
+the matched table.
+
+**Session 6 = `--run screen2`**: round 1 is seed 0 of all six (about 4.2 h on two T4s if nothing is killed,
+shrunk_w400 before tied_w600 so its reference exists), then seeds 1 and 2 in the same order; 18 runs in all,
+the launch deadline leaves the tail for another session. **Compute:** Kaggle's weekly quota is used up
+(sessions 4 and 5 took about 38 GPU-hours since Sep 20). Kaggle's terms allow one account per person. The
+same notebook runs on Colab (the runner already detects `/content`), and the local RTX 3070 fits size S at
+2.2 GB; on any GPU other than a T4 the three shrunk r4 seeds and shrunk_w400 must be rerun there first,
+because results are never pooled across GPUs.

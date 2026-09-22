@@ -42,6 +42,12 @@ STEPS = {   # name -> (heading, command, note)
                "python cloud_run.py grid --stage screen --max_hours 11",
                "Thirteen variants in priority order (grid.py screen_arms); the launch deadline drops the tail. "
                "Compare each final loss with S_shrunk_r4_s0 = 4.1043 and S_dense_s0 = 4.0867."),
+    "screen2": ("Experiment B: screen 2, gates that are cheap in a different way (size S, seeds 0-2)",
+                "python cloud_run.py grid --stage screen2 --max_hours 11",
+                "Tied, tied-relu, thin+tied and shared gates at the shrunk_r4 budget, plus shrunk 400 vs tied 600 "
+                "(grid.py screen2_arms). Every run compares itself with the same-seed shrunk reference at steps "
+                "2000 and 3000 and stops early if it is clearly behind (train.py --ref_json). References: "
+                "S_shrunk_r4 s0/s1/s2 = 4.1043 / 4.1043 / 4.1124."),
     "lr": ("Experiment B: learning-rate check", "python cloud_run.py grid --stage lr --max_hours 11", ""),
     "heal": ("Experiment C: truncate, then train only the new factors", "python cloud_run.py heal", ""),
     "bench": ("Measured speed and memory of every arm", "python cloud_run.py bench", ""),

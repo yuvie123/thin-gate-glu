@@ -110,6 +110,12 @@ def run_jobs(gpu, jobs, dry):
         if os.path.exists(expected):
             say(f"gpu{gpu} [done]   {label}")
             continue
+        base, sep, seed = expected[:-5].rpartition("_s")
+        if sep and seed.isdigit() and seed != "0" and killed_run(f"{base}_s0.json"):
+            # a variant whose seed 0 was stopped by the reference rule does not get more seeds (no file is
+            # written, so the decision can be revisited by hand later)
+            say(f"gpu{gpu} [skip]   {label}: seed 0 was killed by the reference rule")
+            continue
         if dry:
             say(f"gpu{gpu} [would]  {label}: {' '.join(cmd[1:])}")
             continue
@@ -136,9 +142,19 @@ def run_jobs(gpu, jobs, dry):
         pack()
 
 
+def killed_run(path):
+    if not os.path.exists(path):
+        return False
+    with open(path) as f:
+        return "killed" in json.load(f)
+
+
 def summarize(path):
     with open(path) as f:
         r = json.load(f)
+    if "killed" in r:
+        k = r["killed"]
+        return f"KILLED at step {k['step']}: val {k['val']:.4f} vs reference {k['ref_val']:.4f} (+{k['margin']:.3f} allowed)"
     if "base_ppl" in r:
         note = ""
         if not 3 < r["base_ppl"] < 100:
@@ -196,7 +212,13 @@ def cmd_check(args):
                        ("smoke grouped", smoke + ["--name", "smoke_grouped", "--gate_groups", "2", "--gate_rank", "0"]),
                        ("smoke spectral", smoke + ["--name", "smoke_spectral", "--lowrank_init", "spectral", "--factor_wd", "none"]),
                        ("smoke bottleneck", smoke + ["--name", "smoke_bottleneck", "--bottleneck", "norm_silu"]),
-                       ("smoke warm start", smoke + ["--name", "smoke_warm", "--thin_at", "0.5"])]:
+                       ("smoke warm start", smoke + ["--name", "smoke_warm", "--thin_at", "0.5"]),
+                       ("smoke tied", smoke + ["--name", "smoke_tied", "--gate_tie", "up"]),
+                       ("smoke tied relu", smoke + ["--name", "smoke_tied_relu", "--gate_tie", "up", "--gate_act", "relu"]),
+                       ("smoke thin tied", smoke + ["--name", "smoke_thin_tied", "--gate_tie", "up", "--gate_rank", "16"]),
+                       ("smoke shared", smoke + ["--name", "smoke_shared", "--gate_shared", "1"]),
+                       ("smoke kill rule", smoke + ["--name", "smoke_killed", "--ref_json", "results/smoke/smoke.json",
+                                                    "--kill_steps", "10:-10", "--expect_killed"])]:
         r = subprocess.run(cmd, capture_output=True, text=True)
         tail = (r.stdout + r.stderr).strip().splitlines()[-1:] or [""]
         say(f"{label}: {'ok' if r.returncode == 0 else 'FAILED'}   {tail[0]}")

@@ -119,11 +119,24 @@ run log and the place where every decision is recorded.
   finding stands. Table in `notes.md` 2026-09-22. No notebook built: the next session's content depends on
   the Sep 27 decision.
 
+- **2026-09-22, evening: screen 2 built (decision, author: one more attempt to beat shrunk, with the odds
+  stated first).** Six arms at size S, seeds 0-2: tied gate (gate = up-projection, zero gate parameters,
+  d_ff 1200), tied gate with relu (Primer's squared ReLU), thin gate + tied term (rank 96 plus a per-unit
+  scale), a gate shared across all layers (d_ff 1104), and a starved-budget pair (shrunk 400 vs tied 600).
+  New: `train.py --ref_json/--kill_steps` stops a run at step 2000 / 3000 if it is more than 0.010 / 0.008
+  behind the same-seed shrunk curve (backtested on all 41 finished runs: zero false kills). `tests.py` has
+  15 tests; the baseline smoke curve is unchanged. Priors, backtest and the promotion rule are in
+  `notes.md` 2026-09-22 evening. **Kaggle quota is exhausted;** the notebook also runs on Colab.
+
 ### Next, in order
 1. ~~Session 2: pilot~~, ~~Session 3: main_S key arms~~, ~~Session 4: screen~~ (all dropped),
    ~~Session 5: main_S rest~~ done 2026-09-22. `main_S` is complete.
-2. **Nothing to upload until the decision.** Kaggle quota is idle; the next session is either the rank sweep
-   (below) or, under a no-go, nothing.
+2. **Session 6 (built 2026-09-22, upload next): `cloud_notebook.ipynb` from `make_cloud_notebook.py --run
+   screen2`.** 18 runs with the early-kill rule; round 1 (seed 0 of all six) is about 4.2 h on two T4s if
+   nothing is killed, the rest follows until the launch deadline. Take in as usual, then apply the promotion
+   rule in `notes.md` 2026-09-22 evening (win: paired 3-seed mean at or below -0.005 with all pairs negative).
+   Compute: Kaggle quota is used up this week; Colab runs the same notebook; the local RTX 3070 works if the
+   shrunk references are rerun there first.
 3. **Sun Sep 27, 6 pm: go / pivot / no-go.** The screen closed the "which structure on the gate" route. The
    data argue for the **contrast paper** (post-hoc tolerance does not predict trainability; Exp. A, B, C kept;
    retitle). If chosen, add `thin_up_r2/r8` and `thin_down_r2/r8` to `grid.py` (rerun `tests.py`) so Exp. B's
@@ -161,7 +174,7 @@ After the go, the remaining sessions are `main_S`, `main_M`, then `heal,bench`, 
 2. Report failures and unflattering results plainly (e.g. low-rank arms not being faster, down beating gate at low rank). A negative result is acceptable; an unsupported claim is an ethics violation.
 3. Fair comparisons: identical data order, token budget, schedule, learning rate and seeds across arms. Never tune the method more than the baseline. If `TOKENS` in `grid.py` must change for time, change it before a grid starts and rerun everything at that size.
 4. Compare every gap to the seed-to-seed spread of the dense baseline before calling it an effect.
-5. Run `python tests.py` after any change to `model.py`, `grid.py`, `posthoc_truncate.py` or `data.py` (on the Mac with the Desktop `.venv`, and again on Kaggle via the notebook's check step).
+5. Run `python tests.py` after any change to `model.py`, `train.py`, `grid.py`, `posthoc_truncate.py` or `data.py` (on the Mac with the Desktop `.venv`, and again on Kaggle via the notebook's check step).
 6. One Kaggle session at a time; rebuild the notebook after any code change, because the copy inside an old notebook does not update.
 7. Keep a dated `notes.md` log of every run launched, failures, and decisions.
 8. AI use is disclosed in the paper (`paper/main.tex`, AI use statement). Keep that statement true as the work evolves. The author must understand and be able to defend everything; explain what you do and why.

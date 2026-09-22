@@ -74,6 +74,14 @@ WeLore (2407.11239) publish per-projection importance or rank profiles, so per-m
 new in itself; what would be new is the controlled equal-rank comparison, the selection-vs-content
 reading of it, and the from-scratch architecture. None of this is settled until those figures are read.
 
+## Screen 2: read these if a tied gate wins (added 2026-09-22; ids verified on arXiv, NONE read yet)
+- arXiv 2002.05202, Shazeer 2020, "GLU Variants Improve Transformer". The equal-parameter comparison of a
+  GLU at 2/3 width against a plain FFN; the result that argues *against* the tied gate.
+- arXiv 2109.08668, So et al. 2021, "Primer: Searching for Efficient Transformers for Language Modeling".
+  Squared ReLU in the FFN; `tied_gate_relu` is exactly this activation, so it must be cited as such.
+- arXiv 1710.05941, Ramachandran et al. 2017, "Searching for Activation Functions". Swish as a self-gated
+  activation; the tied gate is the GLU version of the same idea.
+
 ## Low-rank pretraining (others)
 - [ ] arXiv 2508.02668: LOST (low-rank + sparse pretraining)
 - [ ] arXiv 2603.06492: NOBLE (nonlinear low-rank branches)

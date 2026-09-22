@@ -111,7 +111,8 @@ def arm_of(name):            # "S_thin_gate_r4_s0" -> ("S", "thin_gate_r4")
 
 
 def arm_color(arm):
-    if arm.startswith(("thin_gate", "reinvest", "monarch_gate", "grouped_gate", "bottleneck", "warm_gate")):
+    if arm.startswith(("thin_gate", "reinvest", "monarch_gate", "grouped_gate", "bottleneck", "warm_gate",
+                       "tied_gate", "thin_tied", "shared_gate")):
         return STYLE["gate_proj"][0]
     if arm.startswith(("thin_up", "grouped_up")):
         return STYLE["up_proj"][0]
@@ -220,7 +221,7 @@ if __name__ == "__main__":
     skip = [d for d in ("smoke", "scratch") if d not in args.results_dir]      # toy / throwaway runs never reach the paper
     found = [json.load(open(p)) for p in paths if not any(os.sep + d + os.sep in p for d in skip)]
     posthoc = [r for r in found if "records" in r]
-    training = [r for r in found if "final_val_loss" in r]
+    training = [r for r in found if "final_val_loss" in r and not r.get("killed")]   # early-killed runs stay out
     heal = [r for r in found if "ppl_healed" in r]
     print(f"found {len(posthoc)} post-hoc, {len(training)} training, {len(heal)} healing result files")
     for method in ("plain", "whiten"):

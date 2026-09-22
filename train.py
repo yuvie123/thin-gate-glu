@@ -49,6 +49,17 @@ def get_args():
     ap.add_argument("--bottleneck", default="linear", choices=["linear", "silu", "norm_silu"])
     ap.add_argument("--factor_wd", default="same", choices=["same", "half", "none"],
                     help="weight decay on low-rank / Monarch factors relative to --weight_decay")
+    ap.add_argument("--gate_tie", default="none", choices=["none", "up"],
+                    help="up: the gate reuses the up-projection (h = act(z) * z); with --gate_rank a rank-r term "
+                         "and a per-unit scale are added to it")
+    ap.add_argument("--gate_act", default="silu", choices=["silu", "relu"], help="activation on the gate")
+    ap.add_argument("--gate_shared", type=int, default=0, help="1: one dense gate matrix shared by every layer")
+    ap.add_argument("--ref_json", default="",
+                    help="a finished run's JSON; at each --kill_steps step this run stops early if its validation "
+                         "loss is above the reference's at the same step by more than the margin")
+    ap.add_argument("--kill_steps", default="2000:0.010,3000:0.008",
+                    help="step:margin pairs for --ref_json (backtested on the size-S grid, see notes.md 2026-09-22)")
+    ap.add_argument("--expect_killed", action="store_true", help="smoke check: fail unless the kill rule fired")
     ap.add_argument("--thin_at", type=float, default=0.0,
                     help="warm start: train a DENSE gate for this fraction of the steps, then replace it by a "
                          "rank --gate_rank factorization (whitened SVD) and continue. 0 = off")
@@ -128,6 +139,23 @@ def thin_gates(model, opt, rank, grams, factor_wd):
 
 
 @torch.no_grad()
+@torch.no_grad()
+def max_up_preactivation(model, data, args, device, autocast):
+    """Largest |up(x)| over one validation batch, from the uncompiled model. A tied gate multiplies z by
+    act(z), so this says how far the run is from float16's limit (|z| = 256 -> z^2 = 65536)."""
+    peak = [0.0]
+    hooks = [b.mlp.up.register_forward_hook(lambda m, i, o: peak.__setitem__(0, max(peak[0], o.detach().abs().max().item())))
+             for b in model.blocks]
+    model.eval()
+    x, y = next(iter(data.val_batches(args.micro_bs, 1)))
+    with autocast:
+        model(x.to(device), y.to(device))
+    model.train()
+    for h in hooks:
+        h.remove()
+    return peak[0]
+
+
 def evaluate(model, data, args, device, autocast):
     model.eval()
     losses = []
@@ -148,7 +176,7 @@ def main():
         args.tokens, args.warmup_steps, args.eval_every, args.eval_seqs = 64 * 8 * 20, 5, 10, 16
         args.name = args.name or "smoke"
         args.out_dir = "results/smoke"
-        if not (args.gate_rank or args.gate_groups > 1 or args.gate_monarch):
+        if not (args.gate_rank or args.gate_groups > 1 or args.gate_monarch or args.gate_tie != "none" or args.gate_shared):
             args.gate_rank = 16                     # the smoke run exercises the low-rank path by default
     assert args.name, "give the run a --name"
     d_ff = args.d_ff or d_ff
@@ -164,6 +192,7 @@ def main():
         gate_rank=args.gate_rank, up_rank=args.up_rank, down_rank=args.down_rank,
         gate_groups=args.gate_groups, up_groups=args.up_groups, down_groups=args.down_groups,
         gate_monarch=args.gate_monarch, lowrank_init=args.lowrank_init, bottleneck=args.bottleneck,
+        gate_tie=args.gate_tie, gate_act=args.gate_act, gate_shared=args.gate_shared,
     )
     if args.thin_at > 0:
         assert 0 < args.thin_at < 1 and args.gate_rank > 0, "--thin_at needs 0 < f < 1 and a --gate_rank target"
@@ -212,6 +241,17 @@ def main():
         calib_blocks = calibration_blocks(data, 8 * args.micro_bs, seed=args.seed + 10_000)
 
     log = {"train": [], "val": []}
+    ref_curve, ref_name, killed = {}, None, None
+    kill_steps = {int(k): float(m) for k, m in (kv.split(":") for kv in args.kill_steps.split(",") if kv)}
+    if args.ref_json:
+        if os.path.exists(args.ref_json):
+            with open(args.ref_json) as f:
+                ref = json.load(f)
+            ref_curve, ref_name = {e["step"]: e["loss"] for e in ref["log"]["val"]}, ref["name"]
+            print(f"[{args.name}] early-kill reference {ref_name}: " +
+                  ", ".join(f"step {k} margin +{m:.3f}" for k, m in sorted(kill_steps.items())))
+        else:
+            print(f"[{args.name}] WARNING: reference {args.ref_json} not found; the kill rule is off for this run")
     if device == "cuda":
         torch.cuda.reset_peak_memory_stats()
     t_start = time.time()
@@ -267,10 +307,23 @@ def main():
             val = evaluate(step_model, data, args, device, autocast)
             log["val"].append({"step": step + 1, "loss": val})
             print(f"[{args.name}] step {step + 1}  VAL loss {val:.4f}")
+            if ref_curve and step + 1 in kill_steps:
+                ref_val = ref_curve.get(step + 1)
+                if ref_val is None:
+                    print(f"[{args.name}] WARNING: reference has no eval at step {step + 1}; no kill decision")
+                elif val - ref_val > kill_steps[step + 1]:
+                    killed = {"step": step + 1, "val": val, "ref_val": ref_val, "gap": val - ref_val,
+                              "margin": kill_steps[step + 1], "ref": ref_name}
+                    print(f"[{args.name}] KILLED at step {step + 1}: VAL {val:.4f} vs {ref_name} {ref_val:.4f} "
+                          f"(gap +{val - ref_val:.4f} > {kill_steps[step + 1]:.3f}); stopping early")
+                    break
+                else:
+                    print(f"[{args.name}] kill check at step {step + 1}: gap {val - ref_val:+.4f} vs +{kill_steps[step + 1]:.3f}, continue")
 
     if device == "cuda":
         torch.cuda.synchronize()
     wall = time.time() - t_start
+    max_preact = max_up_preactivation(model, data, args, device, autocast)
     tok_per_s = timed_tokens / (time.time() - t_timed) if t_timed and timed_tokens else None
 
     result = {
@@ -281,7 +334,8 @@ def main():
         "flops_per_token": flops_per_token(model),
         "params_initial": params_initial,
         "flops_per_token_initial": flops_initial,
-        "final_val_loss": log["val"][-1]["loss"],
+        **({"killed": killed} if killed else {"final_val_loss": log["val"][-1]["loss"]}),
+        "max_up_preactivation": max_preact,       # float16 safety for tied gates: z * act(z) needs |z| < 256
         "tokens_per_second": tok_per_s,
         "wall_seconds": wall,
         "peak_memory_gb": torch.cuda.max_memory_allocated() / 1e9 if device == "cuda" else None,
@@ -294,8 +348,14 @@ def main():
     path = os.path.join(args.out_dir, f"{args.name}.json")
     with open(path, "w") as f:
         json.dump(result, f, indent=1)
-    print(f"[{args.name}] done: final val loss {result['final_val_loss']:.4f}, "
-          f"{tok_per_s and round(tok_per_s)} tok/s, {wall / 60:.1f} min -> {path}")
+    if killed:
+        print(f"[{args.name}] killed at step {killed['step']} (val {killed['val']:.4f} vs {killed['ref']} "
+              f"{killed['ref_val']:.4f}), {wall / 60:.1f} min -> {path}")
+    else:
+        print(f"[{args.name}] done: final val loss {result['final_val_loss']:.4f}, "
+              f"{tok_per_s and round(tok_per_s)} tok/s, {wall / 60:.1f} min -> {path}")
+    if args.expect_killed and not killed:
+        raise SystemExit("the kill rule did not fire although --expect_killed was given")
 
 
 if __name__ == "__main__":
