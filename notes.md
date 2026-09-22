@@ -895,3 +895,9 @@ the launch deadline leaves the tail for another session. **Compute:** Kaggle's w
 same notebook runs on Colab (the runner already detects `/content`), and the local RTX 3070 fits size S at
 2.2 GB; on any GPU other than a T4 the three shrunk r4 seeds and shrunk_w400 must be rerun there first,
 because results are never pooled across GPUs.
+
+### 2026-09-22, later: Exp. B drafted into the paper while session 6 runs
+
+`plot.py` gained `tables/paired.tex`, `tables/macros.tex` and the main / screen / starved split of the
+training outputs; `paper/main.tex` gained the Exp. B setup paragraph and the results subsection (numbers only
+through macros and `\input` tables). Compiles with tectonic, 8 pages. Nothing cited yet (rule 1).

@@ -128,6 +128,14 @@ run log and the place where every decision is recorded.
   15 tests; the baseline smoke curve is unchanged. Priors, backtest and the promotion rule are in
   `notes.md` 2026-09-22 evening. **Kaggle quota is exhausted;** the notebook also runs on Colab.
 
+- **2026-09-22, later: Exp. B written into `paper/main.tex`** (setup paragraph and the results subsection
+  with five findings: noise floor, thin gate never beats shrunk, gate = up while down is worst, the dense
+  block is wider than needed at S, screened alternatives; plus the Exp. A / B contrast). `plot.py` now also
+  writes `tables/paired.tex` (seed-paired gaps), `tables/macros.tex` (every number the text uses, as LaTeX
+  macros), and splits the training table/figure into `training` (planned grid), `training_screen`
+  (variants at seed 0, shrunk r4 as reference) and, once run, `training_starved`. Compiles with tectonic;
+  8 pages with an empty bibliography. Remaining `\todo`s need reading (citations), size M, Exp. C, bench.
+
 ### Next, in order
 1. ~~Session 2: pilot~~, ~~Session 3: main_S key arms~~, ~~Session 4: screen~~ (all dropped),
    ~~Session 5: main_S rest~~ done 2026-09-22. `main_S` is complete.
