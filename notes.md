@@ -762,3 +762,61 @@ Options for the Sep 27 decision, updated (author's call):
 `plot.py` now writes warm-started arms to `tables/warm_start.tex` (swap step, val before and after, final)
 and keeps them out of `training.pdf` / `tables/training.tex`, which are regenerated with 22 matched arms and
 committed. Nothing from sessions 3 or 4 is in `paper/main.tex` yet.
+
+## 2026-09-22
+
+### 2026-09-22: Kaggle session 5 taken in: main_S complete, 33 runs, every arm at three seeds
+
+Zip renamed `thin_gate_results_session5_mainS.zip` (browser name was `thin_gate_results (4).zip`). Session
+ran 00:09 to 09:02 UTC Sep 22, 8.9 h; same library versions. Checks ok (`tests.py` 11/11, all smokes). The 12
+remaining `main_S` runs (seeds 1-2 of thin_gate_r2/r8, shrunk_r2/r8, reinvest_r4, all_lowrank_r4) all finished
+`[ok]`, 77-90 min each; no nan, inf or overflow in any log; nothing skipped. 74 files in the zip; the 48
+carried result files came back byte-identical; the 12 new files are committed in `results/train/`.
+**`main_S` is complete: 11 arms x 3 seeds = 33 runs, plus the 13 screen runs at seed 0.**
+
+| Arm | s0 | s1 | s2 | mean | range | MLP params |
+|---|---|---|---|---|---|---|
+| dense | 4.0867 | 4.0834 | 4.1125 | 4.0942 | 0.029 | 7,077,888 |
+| shrunk r2 | 4.0969 | 4.0955 | 4.0904 | 4.0942 | 0.006 | 6,359,040 |
+| reinvest r4 | 4.1039 | 4.1042 | 4.0952 | 4.1011 | 0.009 | 7,064,064 |
+| shrunk r8 | 4.1009 | 4.1074 | 4.1080 | 4.1054 | 0.007 | 5,142,528 |
+| thin gate r2 | 4.1076 | 4.0997 | 4.1115 | 4.1063 | 0.012 | 6,340,608 |
+| shrunk r4 | 4.1043 | 4.1043 | 4.1124 | 4.1070 | 0.008 | 5,529,600 |
+| thin up r4 | 4.1171 | 4.1145 | 4.1147 | 4.1155 | 0.003 | 5,529,600 |
+| thin gate r4 | 4.1250 | 4.1151 | 4.1145 | 4.1182 | 0.010 | 5,529,600 |
+| thin gate r8 | 4.1313 | 4.1352 | 4.1295 | 4.1320 | 0.006 | 5,124,096 |
+| thin down r4 | 4.1470 | 4.1476 | 4.1360 | 4.1435 | 0.012 | 5,529,600 |
+| all lowrank r4 | 4.1682 | 4.1539 | 4.1665 | 4.1629 | 0.014 | 5,474,304 |
+
+**What the completed grid says, stated plainly:**
+
+- **Thin gate loses to shrunk at every rank, at every seed.** Paired by seed, shrunk r2 beats thin gate r2 by
+  0.011 / 0.004 / 0.021 (mean gap 0.012); shrunk r4 beats thin gate r4 by 0.021 / 0.011 / 0.002 (0.011);
+  shrunk r8 beats thin gate r8 by 0.030 / 0.028 / 0.022 (0.027). Nine of nine pairs go the same way. The gap
+  is flat from d/2 to d/4 and doubles at d/8.
+- **Shrunk r2 matches dense on the mean (4.0942 vs 4.0942) with 10% fewer MLP parameters**, and its three
+  seeds (range 0.006) all fall inside the dense range. At this scale the size-S MLP is over-parameterized by
+  about that much, which is a property of the baseline, not a result about gates.
+- **Reinvest** (thin gate r4 with d_ff widened back to the dense parameter count) is 0.007 worse than dense on
+  the mean; seeds overlap the dense band (one seed each way). Spending the gate savings on width does not
+  beat dense, but it is not clearly worse either. It is the only thin-gate arm within noise of dense.
+- **Thin gate r8** (4.1320, range 0.006) sits between thin gate r4 and thin down r4 in loss, but at a smaller
+  parameter count; arms at different budgets are not compared directly, only against their shrunk twin.
+- **All-lowrank r4** is the worst arm by a wide margin (0.069 above dense, seed ranges far apart).
+- Seed ranges of the low-rank arms are 0.003 to 0.014; the dense range (0.029) is still set by its one unlucky
+  seed. The noise-floor convention stays the dense range.
+- Tokens/s in the table is still not a speed measurement (54k-65k for the same arm depending on the job sharing
+  the machine); `bench.py` is the only source for speed claims.
+
+**Verdict, with the grid complete:** the titled hypothesis fails at size S at every rank tried. Thin gate is
+never better than thin up, never better than shrunk, and the deficit to shrunk grows as the gate gets thinner.
+The session-3 contrast finding stands unchanged and is now backed by three seeds at three ranks and by the
+13 screened alternatives.
+
+For the Sep 27 decision (author's call): the options recorded on 2026-09-21 are unchanged. If the contrast paper
+is chosen, the next session is the rank sweep of the other two projections (`thin_up_r2/r8`, `thin_down_r2/r8`
+at three seeds, 12 runs, a `grid.py` change plus `tests.py`). No notebook is built yet because that session's
+content depends on the decision.
+
+`training.pdf` and `tables/training.tex` are regenerated (22 matched arms, now 11 of them at three seeds) and
+committed. Nothing from sessions 3-5 is in `paper/main.tex` yet.

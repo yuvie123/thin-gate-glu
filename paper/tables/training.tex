@@ -3,11 +3,11 @@
 Size & Arm & MLP params & Val. loss (mean $\pm$ std) & Seeds & Tokens/s \\
 \midrule
 S & dense & 7,077,888 & 4.0942 $\pm$ 0.0159 & 3 & 57,086 \\
-S & shrunk r2 & 6,359,040 & 4.0969 $\pm$ n/a & 1 & 62,782 \\
-S & shrunk r8 & 5,142,528 & 4.1009 $\pm$ n/a & 1 & 59,840 \\
-S & reinvest r4 & 7,064,064 & 4.1039 $\pm$ n/a & 1 & 60,850 \\
+S & shrunk r2 & 6,359,040 & 4.0942 $\pm$ 0.0034 & 3 & 58,976 \\
+S & reinvest r4 & 7,064,064 & 4.1011 $\pm$ 0.0051 & 3 & 57,347 \\
+S & shrunk r8 & 5,142,528 & 4.1054 $\pm$ 0.0040 & 3 & 63,427 \\
+S & thin gate r2 & 6,340,608 & 4.1063 $\pm$ 0.0060 & 3 & 59,294 \\
 S & shrunk r4 & 5,529,600 & 4.1070 $\pm$ 0.0047 & 3 & 61,663 \\
-S & thin gate r2 & 6,340,608 & 4.1076 $\pm$ n/a & 1 & 57,619 \\
 S & thin gate r4 spectral nowd & 5,529,600 & 4.1127 $\pm$ n/a & 1 & 59,956 \\
 S & bottleneck norm gate r4 & 5,530,176 & 4.1140 $\pm$ n/a & 1 & 59,918 \\
 S & thin gate r4 spectral & 5,529,600 & 4.1146 $\pm$ n/a & 1 & 60,108 \\
@@ -20,9 +20,9 @@ S & thin gate r4 halfwd & 5,529,600 & 4.1252 $\pm$ n/a & 1 & 59,597 \\
 S & grouped down g4 & 5,515,776 & 4.1259 $\pm$ n/a & 1 & 60,232 \\
 S & bottleneck gate r4 & 5,529,600 & 4.1276 $\pm$ n/a & 1 & 60,002 \\
 S & thin gate r4 nowd & 5,529,600 & 4.1288 $\pm$ n/a & 1 & 59,472 \\
-S & thin gate r8 & 5,124,096 & 4.1313 $\pm$ n/a & 1 & 65,260 \\
 S & monarch gate b4 & 5,529,600 & 4.1314 $\pm$ n/a & 1 & 57,189 \\
+S & thin gate r8 & 5,124,096 & 4.1320 $\pm$ 0.0029 & 3 & 63,108 \\
 S & thin down r4 & 5,529,600 & 4.1435 $\pm$ 0.0065 & 3 & 60,080 \\
-S & all lowrank r4 & 5,474,304 & 4.1682 $\pm$ n/a & 1 & 57,619 \\
+S & all lowrank r4 & 5,474,304 & 4.1629 $\pm$ 0.0078 & 3 & 61,092 \\
 \bottomrule
 \end{tabular}

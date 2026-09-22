@@ -112,12 +112,18 @@ run log and the place where every decision is recorded.
   it. Until a `.venv` exists here, run `plot.py`, `tests.py` and `make_cloud_notebook.py` with
   `/Users/aman/Desktop/thin-gate-glu/.venv/bin/python`.
 
+- **2026-09-22: Kaggle session 5 taken in. `main_S` is complete: 11 arms x 3 seeds (33 runs), all ok.**
+  Thin gate loses to shrunk at every rank at every seed (nine of nine pairs; mean gaps 0.012 at d/2, 0.011 at
+  d/4, 0.027 at d/8). Shrunk r2 matches dense on the mean with 10% fewer MLP parameters. Reinvest is within
+  noise of dense. All-lowrank is worst. The titled hypothesis fails at size S at every rank; the contrast
+  finding stands. Table in `notes.md` 2026-09-22. No notebook built: the next session's content depends on
+  the Sep 27 decision.
+
 ### Next, in order
-1. ~~Session 2: pilot~~ done 2026-09-20. ~~Session 3: main_S key arms~~ done 2026-09-20 (15 runs).
-   ~~Session 4: screen~~ done 2026-09-21 (13 runs, all dropped).
-2. **Session 5 (notebook built 2026-09-21, upload next):** `cloud_notebook.ipynb` from
-   `make_cloud_notebook.py --run main_S`: the 12 remaining `main_S` runs (seeds 1-2 of thin_gate_r2/r8,
-   shrunk_r2/r8, reinvest_r4, all_lowrank_r4), about 8.5 h on two T4s, inside one commit. Take in as usual.
+1. ~~Session 2: pilot~~, ~~Session 3: main_S key arms~~, ~~Session 4: screen~~ (all dropped),
+   ~~Session 5: main_S rest~~ done 2026-09-22. `main_S` is complete.
+2. **Nothing to upload until the decision.** Kaggle quota is idle; the next session is either the rank sweep
+   (below) or, under a no-go, nothing.
 3. **Sun Sep 27, 6 pm: go / pivot / no-go.** The screen closed the "which structure on the gate" route. The
    data argue for the **contrast paper** (post-hoc tolerance does not predict trainability; Exp. A, B, C kept;
    retitle). If chosen, add `thin_up_r2/r8` and `thin_down_r2/r8` to `grid.py` (rerun `tests.py`) so Exp. B's
@@ -125,7 +131,7 @@ run log and the place where every decision is recorded.
    decision in `notes.md`.
 4. Meanwhile the author reads WeLore (Sec. 2.1, 2.4, 3.1, Figs 1, 3, 7) first, then the other must-reads in
    `related.md`; BibTeX exported from each paper's page only after reading it.
-5. **Sep 28 - Oct 11:** the rank-sweep session if the contrast paper is chosen. Related Work and Method drafts.
+5. **Sep 28 - Oct 11:** the rank-sweep session if the contrast paper is chosen (`make_cloud_notebook.py --run main_S` after the `grid.py` change; the runner skips the 33 finished runs). Related Work and Method drafts.
 6. **Oct 12 - Oct 25:** measure size-M throughput, set `TOKENS["M"]`, rerun `tests.py`, then `--run main_M`
    (14 runs), then `--run heal,bench`. Setup and Exp. A results sections.
 7. **Oct 26 - Nov 8:** `--stage lr` if quota allows; optional lm-eval zero-shot. Results for B and C;
