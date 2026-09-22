@@ -123,7 +123,7 @@ run log and the place where every decision is recorded.
   stated first).** Six arms at size S, seeds 0-2: tied gate (gate = up-projection, zero gate parameters,
   d_ff 1200), tied gate with relu (Primer's squared ReLU), thin gate + tied term (rank 96 plus a per-unit
   scale), a gate shared across all layers (d_ff 1104), and a starved-budget pair (shrunk 400 vs tied 600).
-  New: `train.py --ref_json/--kill_steps` stops a run at step 2000 / 3000 if it is more than 0.010 / 0.008
+  New: `train.py --ref_json/--kill_steps` stops a run at step 2000 / 3000 if it is more than 0.015 / 0.010
   behind the same-seed shrunk curve (backtested on all 41 finished runs: zero false kills). `tests.py` has
   15 tests; the baseline smoke curve is unchanged. Priors, backtest and the promotion rule are in
   `notes.md` 2026-09-22 evening. **Kaggle quota is exhausted;** the notebook also runs on Colab.

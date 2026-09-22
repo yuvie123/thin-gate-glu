@@ -863,10 +863,14 @@ curve; eval every 250 steps, 4577 steps per run):
 
 Every wrong sign after step 1250 belongs to a run that ends within 0.005 of shrunk. At step 2000 (44% of
 training, 37 of 85 minutes) the gap is within 0.010 of its final value for every arm that ends within 0.03
-of shrunk. Rule: **stop at step 2000 if the run is more than 0.010 behind the same-seed reference, at step
-3000 if more than 0.008 behind.** In the backtest this has zero false kills (no run that ended at or below
+of shrunk. Rule (loosened on review, same evening; the first version was 0.010 / 0.008): **stop at step 2000 if the
+run is more than 0.015 behind the same-seed reference, at step 3000 if more than 0.010 behind.** The looser
+margin exists because one far-behind arm (all-lowrank s0) gained 0.018 on shrunk after step 2000, so a new
+activation family that starts slowly could sit at +0.011 at step 2000 and still end ahead; at 0.015 / 0.010
+the backtest still has zero false kills and still catches all 21 runs that end at +0.015 or worse, a few of
+them at step 3000 instead of 2000 (19 minutes later). In the backtest this has zero false kills (no run that ended at or below
 shrunk would have been stopped; the closest call is reinvest s0 at +0.011 at step 2000 with a final gap of
--0.0004, which is why the margin is 0.010 and not less) and catches every run that ends at +0.017 or worse.
+-0.0004) and catches every run that ends at +0.017 or worse.
 Killed runs write a JSON with `killed` and no `final_val_loss`; `plot.py` ignores them, the notebook carries
 them so they are not rerun, and the runner does not start seeds 1-2 of an arm whose seed 0 was killed. The
 early steps (500: 12 wrong signs out of 41) are also the reason no short CPU pilot is used as evidence:

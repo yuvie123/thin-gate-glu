@@ -57,7 +57,7 @@ def get_args():
     ap.add_argument("--ref_json", default="",
                     help="a finished run's JSON; at each --kill_steps step this run stops early if its validation "
                          "loss is above the reference's at the same step by more than the margin")
-    ap.add_argument("--kill_steps", default="2000:0.010,3000:0.008",
+    ap.add_argument("--kill_steps", default="2000:0.015,3000:0.010",
                     help="step:margin pairs for --ref_json (backtested on the size-S grid, see notes.md 2026-09-22)")
     ap.add_argument("--expect_killed", action="store_true", help="smoke check: fail unless the kill rule fired")
     ap.add_argument("--thin_at", type=float, default=0.0,
