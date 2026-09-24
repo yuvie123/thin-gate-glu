@@ -232,6 +232,40 @@ def write_macros(by, out_dir):
     print("wrote", path)
 
 
+CONTEXT_RANKS = {"tied_gate_relu": 0, "thin_tied_relu_r8": 48, "thin_tied_relu_r4": 96, "thin_tied_relu_r2": 192}
+
+
+def plot_context_rank(by, out_dir):
+    """The screen-3 figure: loss of the relu self-gate against the rank of its context term, at one parameter
+    count (the width shrinks as the rank grows). References: shrunk r4 and dense, as horizontal bands."""
+    S = by.get("S", {})
+    pts = [(r, [x["final_val_loss"] for x in S[a]], S[a][0]["config"]["d_ff"]) for a, r in CONTEXT_RANKS.items() if a in S]
+    if not pts:
+        return
+    fig, ax = plt.subplots(figsize=(3.3, 2.4))
+    for name, color in (("shrunk_r4", NEUTRAL), ("dense", MUTED)):
+        if name in S:
+            v = [x["final_val_loss"] for x in S[name]]
+            ax.axhspan(min(v), max(v), color=color, alpha=0.18, lw=0)
+            ax.axhline(statistics.mean(v), color=color, lw=0.8, ls="--")
+            ax.text(200, statistics.mean(v), name.replace("_", " "), color=color, fontsize=7, va="bottom", ha="right")
+    xs = [r for r, _, _ in pts]
+    means = [statistics.mean(v) for _, v, _ in pts]
+    ax.plot(xs, means, color=STYLE["gate_proj"][0], marker="o", ms=4, lw=1.5, zorder=3)
+    for r, v, F_ in pts:
+        ax.scatter([r] * len(v), v, s=8, color=INK, alpha=0.5, zorder=4, linewidths=0)
+        ax.annotate(f"$d_{{ff}}$={F_}", (r, max(v)), textcoords="offset points", xytext=(0, 4), ha="center", fontsize=6, color=MUTED)
+    ax.set_xticks([0, 48, 96, 192])
+    ax.set_xlabel("rank of the context term (same parameters)")
+    ax.set_ylabel("validation loss")
+    ax.grid(True, axis="y")
+    fig.tight_layout()
+    path = os.path.join(out_dir, "figures", "context_rank.pdf")
+    fig.savefig(path)
+    plt.close(fig)
+    print("wrote", path)
+
+
 def plot_training(runs, out_dir):
     runs = [r for r in runs if "_lr" not in r["name"]]
     warm = [r for r in runs if "thin_swap" in r.get("log", {})]     # not parameter-matched from step 0
@@ -245,6 +279,7 @@ def plot_training(runs, out_dir):
         by_all[size][arm].append(r)
     table_paired(by_all, out_dir)
     write_macros(by_all, out_dir)
+    plot_context_rank(by_all, out_dir)
     for family in ("main", "screen", "starved"):
         by = {size: {a: v for a, v in arms.items() if arm_family(a) == family or (family == "screen" and a == "shrunk_r4")}
               for size, arms in by_all.items()}
