@@ -999,3 +999,42 @@ Pre-tests: `tests.py` 16/16 (new: the pair-tied forward against a hand computati
 parameter count); the baseline smoke curve is unchanged (`6.2531, 6.2524`); the pair-tied smoke trains; the
 Kaggle check step adds a compiled pair-tied smoke. Same honesty as before: no design can be guaranteed to beat
 shrunk; these two have the best-founded odds available, and the odds are on record before the runs.
+
+### 2026-09-24: novelty search before session 7 (author's request); the screen-2 win is Primer's squared ReLU
+
+Searched the web (arXiv, Semantic Scholar hits, blogs) for the screen-2 winner and the two screen-3 candidates.
+Findings, with the papers logged in `related.md` under today's date:
+
+1. **The relu-tied gate is Primer's squared ReLU, stated in Primer itself** (So et al. 2021): "equivalent when
+   ReGLU's U and V weight matrices are the same and squared ReLU is immediately preceded by a linear
+   transformation with weight matrix U"; squared ReLU beats ReGLU and SwiGLU at 110M on C4. The xIELU paper
+   (Huang and Schlag, 2024/25) repeats the equivalence and reports SwiGLU 2.353 > ReLU^2 2.337 > xIELU 2.323
+   at 1.1B on 125B tokens. **Our session-6 result reproduces Primer at 28M. It is not new.** It stays in the
+   paper as a control and as the anchor of the argument, cited once read.
+2. **Partner-gated units are a special case of Masked GLU** (Tajima et al. 2025): one shared weight matrix,
+   learned element-wise masks assign gate or value; SwiMGLU matches or beats SwiGLU. Our pairing is a fixed
+   mask. MGLU also reports that naive gate/value weight sharing in SwiGLU degrades perplexity, which is our
+   silu-tie kill. **Dropped from session 7** (code path and test kept, one line in `grid.py`).
+3. **Context-thresholded self-gating, h = relu(z + BAx) z, was not found** under any of the searches tried
+   (low-rank gate plus self term; input-dependent or low-rank threshold on ReLU^2; GLU with a low-rank gate
+   plus identity). Nearby but different: ELAS (low-rank + ReLU^2 + 2:4 sparsity), MoA / PolyGLU (adaptive
+   activations), MGLU (shared matrix with masks). It remains the candidate contribution, with the caveat
+   that the author must repeat the search on Semantic Scholar and OpenReview before the paper calls it new.
+
+**Session 7 rebuilt accordingly (12 runs, about 8 h).** The rank of the context term is now the experiment:
+`thin_tied_relu_r4` (rank 96, d_ff 1024) at three seeds, `thin_tied_relu_r8` (rank 48, d_ff 1104) and
+`thin_tied_relu_r2` (rank 192, d_ff 880) at seed 0, all at shrunk_r4's parameter count; with the relu tie at
+rank 0 (d_ff 1200, already run) that gives a four-point curve "how much shared context does self-gating need
+at fixed parameters". `shrunk_relu_r4` stays at three seeds: it is ReGLU at 800 and decides whether the
+relu alone explains the win. One-seed tail: the relu tie at the starved budget, the silu tie to the end, the
+relu tie at 800 (2/3 of shrunk's parameters), ReGLU at the dense width.
+
+Odds, restated after the search: context-thresholded r4 beats shrunk on the 3-seed paired mean, about 85%;
+beats the rank-0 relu tie (context beats width), about 50%; the four-point curve is informative whichever way
+it bends. The paper's contribution, if the curve holds up, is not "a new activation" but "what a gate needs":
+full-rank per-unit keys (thin fails), hard selection (silu tie fails), and how much shared context on top.
+
+**Repo visibility, found during the search: the GitHub repository is PUBLIC** (`gh repo view` says
+`visibility: PUBLIC`; the search engine had indexed it with the "CPAL 2027 submission" description). The
+project rule says it must stay private until reviews finish. The assistant did not change it (the rule also
+says never to touch visibility); the author decides today.

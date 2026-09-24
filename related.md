@@ -74,13 +74,38 @@ WeLore (2407.11239) publish per-projection importance or rank profiles, so per-m
 new in itself; what would be new is the controlled equal-rank comparison, the selection-vs-content
 reading of it, and the from-scratch architecture. None of this is settled until those figures are read.
 
-## Screen 2: read these if a tied gate wins (added 2026-09-22; ids verified on arXiv, NONE read yet)
-- arXiv 2002.05202, Shazeer 2020, "GLU Variants Improve Transformer". The equal-parameter comparison of a
-  GLU at 2/3 width against a plain FFN; the result that argues *against* the tied gate.
-- arXiv 2109.08668, So et al. 2021, "Primer: Searching for Efficient Transformers for Language Modeling".
-  Squared ReLU in the FFN; `tied_gate_relu` is exactly this activation, so it must be cited as such.
-- arXiv 1710.05941, Ramachandran et al. 2017, "Searching for Activation Functions". Swish as a self-gated
-  activation; the tied gate is the GLU version of the same idea.
+## Novelty search of 2026-09-24 for the screen-2 win and the screen-3 candidates (abstracts read online by
+## the assistant; the author has read NONE of these yet; cite only after reading)
+- **arXiv 2109.08668, So et al. 2021, "Primer".** MUST READ. States verbatim: "Squared ReLU does have
+  significant overlap with ReGLU and in fact is equivalent when ReGLU's U and V weight matrices are the same
+  and squared ReLU is immediately preceded by a linear transformation with weight matrix U", and "squared
+  ReLUs capture the benefits of these GLU variants, while being simpler, without additional parameters, and
+  delivering better quality" (110M, C4, 525K steps: squared ReLU beats ReGLU and SwiGLU). **Our relu-tied
+  gate is this; the screen-2 win is a reproduction at 28M, not a new result.**
+- **arXiv 2411.13010, Huang and Schlag 2024/25, "Deriving Activation Functions Using Integration" (xIELU).**
+  Repeats the equivalence ("equivalent to ReGLU when the U and V weight matrices are identical") and, at 1.1B
+  and 3B Llama on 125B FineWeb-Edu tokens, reports SwiGLU 2.353 > ReLU^2 2.337 > xIELU 2.323 (loss). So the
+  ordering we see at 28M holds at 1.1B, and a trainable activation beats ReLU^2 there.
+- **arXiv 2506.23225, Tajima et al. 2025, "Masked Gated Linear Unit" (MGLU).** One shared weight matrix
+  produces both gate and value streams through learned element-wise binary masks ("mixture of element-wise
+  gating"); SwiMGLU matches or beats SwiGLU with 47% less memory. Reports that naive weight sharing in SwiGLU
+  degrades perplexity (23.6 -> 27.0), which matches our silu-tie kill. **Our partner-gated units are a fixed
+  pairing mask on a shared matrix, a special case of this family; dropped as a contribution.**
+- arXiv 2002.05202, Shazeer 2020, "GLU Variants Improve Transformer". GLU at 2/3 width vs plain FFN at
+  equal parameters; the baseline result every GLU paper cites.
+- arXiv 1710.05941, Ramachandran et al. 2017, "Searching for Activation Functions". Swish as self-gating.
+- arXiv 2405.20768, Huang 2024, "Expanded Gating Ranges Improve Activation Functions". Per-block trainable
+  scalars on self-gated activations; related in spirit to the per-unit scale in thin+tied.
+- arXiv 2605.03667, 2026, "ELAS". Low-rank pretraining with squared ReLU and 2:4 activation sparsity; close
+  in ingredients (low rank + ReLU^2) but about sparsity, not gate structure. Read to be sure.
+- arXiv 2605.26647, 2026, "More Expressive Feedforward Layers: Token-Adaptive Mixing of Activations" (MoA);
+  arXiv 2603.13347, 2026, "PolyGLU"; arXiv 2608.07323, 2026, "MemGLU". Recent gate/activation designs for
+  the FFN at 9M-600M; none tie the gate, add a low-rank term to a self-gate, or pair units, from the
+  abstracts. Read MoA and PolyGLU for the related-work paragraph.
+- **Not found anywhere (searched: low-rank gate + self term, input-dependent / low-rank threshold for
+  ReLU^2, GLU low-rank gate plus identity):** context-thresholded self-gating, h = relu(z + BAx) z. This is
+  the candidate contribution. The author must repeat the search on Semantic Scholar and OpenReview before
+  the paper calls it new.
 
 ## Low-rank pretraining (others)
 - [ ] arXiv 2508.02668: LOST (low-rank + sparse pretraining)

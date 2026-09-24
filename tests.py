@@ -90,7 +90,7 @@ def test_matched_arms_are_matched():
             assert gap < 0.015, f"{size}/{name} differs from thin gate by {100 * gap:.2f}%"
         assert mlp_params(size, s2["shrunk_w400"]) == mlp_params(size, s2["tied_gate_w600"]), "starved pair not matched"
         s3 = screen3_arms(size)
-        for name in ("shrunk_relu_r4", "thin_tied_relu_r4", "tied_gate", "pair_tied_relu"):
+        for name in ("shrunk_relu_r4", "thin_tied_relu_r4", "thin_tied_relu_r8", "thin_tied_relu_r2", "tied_gate", "pair_tied_relu"):
             gap = abs(mlp_params(size, s3[name]) - thin) / thin
             assert gap < 0.015, f"{size}/{name} differs from thin gate by {100 * gap:.2f}%"
         assert mlp_params(size, s3["tied_gate_relu_w600"]) == mlp_params(size, s2["shrunk_w400"]), "starved pair not matched"

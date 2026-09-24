@@ -14,8 +14,8 @@ Stages follow the day-by-day plan:
     screen  size S, seed 0: variants that might beat shrunk_r4 at the same parameter count (see screen_arms)
     screen2 size S, seeds 0-2: gates that are cheap in a different way (tied, thin+tied, shared) plus a
             starved-budget pair; every run carries a reference curve for the early-kill rule (see screen2_arms)
-    screen3 size S: two new methods built on the screen-2 finding (context-thresholded self-gating, partner-gated
-            units), the control that says what the win means (relu in a dense gate), then diagnostics
+    screen3 size S: context-thresholded self-gating at three context ranks (matched parameters), the control that
+            says what the screen-2 win means (relu in a dense gate), then one-seed diagnostics
 
 Arms (r = rank, d = d_model, F = default d_ff):
     dense            standard SwiGLU
@@ -42,10 +42,13 @@ Screen 2 (matched to shrunk_r4 unless noted):
     shared_gate                 one dense gate matrix for all layers, d_ff widened to 1104
     shrunk_w400 / tied_gate_w600   the starved-budget pair (460,800 params/layer each)
 
-Screen 3 (after the relu tie won screen 2 at three seeds):
-    thin_tied_relu_r4           NEW: context-thresholded self-gating, h = relu(z + BAx) z, rank d/4, d_ff 1024
-    pair_tied_relu              NEW: partner-gated units, h_a = relu(b) a and h_b = relu(a) b, zero gate params, d_ff 1200
+Screen 3 (after the relu tie won screen 2 at three seeds; the relu tie itself is Primer's squared ReLU):
+    thin_tied_relu_rK           context-thresholded self-gating, h = relu(z + BAx) z with BA of rank d/K, d_ff set so
+                                the parameters match shrunk_r4: r = d/2 -> 880, d/4 -> 1024, d/8 -> 1104 (r = 0 -> 1200
+                                is tied_gate_relu, already run). The rank sweep is the experiment: how much shared
+                                context does self-gating need?
     shrunk_relu_r4              control: dense gate, relu instead of silu, d_ff 800: is the win the relu or the tie?
+    pair_tied_relu              (code path kept, not run: a fixed-mask special case of Masked GLU, arXiv 2506.23225)
     tied_gate_relu_w600         the winner at the starved budget (seed 0)
     tied_gate                   the silu tie, rerun to the end under the loosened kill margins (seed 0)
     tied_gate_relu_w800         diagnostic: the winner at shrunk's width, so 2/3 of shrunk's parameters
@@ -134,10 +137,16 @@ def screen3_arms(size, K=4):
     thin_params = 2 * d * F + r * (d + F)
     Fs = round_to(thin_params / (3 * d), 8)                      # shrunk width, 800 at S
     Ft = round_to(thin_params / (2 * d), 8)
+
+    def tied_width(rank):        # rank * (d + F) + 2 * d * F + F = thin_params, rounded to 8
+        return round_to((thin_params - rank * d) / (rank + 2 * d + 1), 8)
+
     return {
         f"thin_tied_relu_r{K}": {"gate_rank": r, "gate_tie": "up", "gate_act": "relu"},
-        "pair_tied_relu": {"d_ff": Ft, "gate_tie": "pair", "gate_act": "relu"},
         f"shrunk_relu_r{K}": {"d_ff": Fs, "gate_act": "relu"},
+        f"thin_tied_relu_r{2 * K}": {"gate_rank": d // (2 * K), "d_ff": tied_width(d // (2 * K)), "gate_tie": "up", "gate_act": "relu"},
+        f"thin_tied_relu_r{K // 2}": {"gate_rank": d // (K // 2), "d_ff": tied_width(d // (K // 2)), "gate_tie": "up", "gate_act": "relu"},
+        "pair_tied_relu": {"d_ff": Ft, "gate_tie": "pair", "gate_act": "relu"},
         "tied_gate_relu_w600": {"d_ff": 600, "gate_tie": "up", "gate_act": "relu"},
         "tied_gate": {"d_ff": Ft, "gate_tie": "up"},
         f"tied_gate_relu_w{Fs}": {"d_ff": Fs, "gate_tie": "up", "gate_act": "relu"},
@@ -198,12 +207,12 @@ def runs_for(stage):
         add("S", list(arms), [0], arms=arms)      # priority order: the launch deadline drops the tail
     elif stage == "screen3":
         arms = screen3_arms("S")
-        refs = {"shrunk_relu_r4": "S_shrunk_r4", "tied_gate_relu_w600": "S_shrunk_w400", "pair_tied_relu": "S_shrunk_r4",
-                "thin_tied_relu_r4": "S_shrunk_r4", "tied_gate": "S_shrunk_r4"}
-        three_seeds = ("thin_tied_relu_r4", "pair_tied_relu", "shrunk_relu_r4")
+        refs = {"shrunk_relu_r4": "S_shrunk_r4", "tied_gate_relu_w600": "S_shrunk_w400", "thin_tied_relu_r8": "S_shrunk_r4",
+                "thin_tied_relu_r4": "S_shrunk_r4", "thin_tied_relu_r2": "S_shrunk_r4", "tied_gate": "S_shrunk_r4"}
+        three_seeds = ("thin_tied_relu_r4", "shrunk_relu_r4")
         for seed in (0, 1, 2):
             for a in arms:
-                if a not in three_seeds and seed > 0:
+                if a == "pair_tied_relu" or (a not in three_seeds and seed > 0):
                     continue                                          # the rest: one seed this session
                 extra = {"ref_json": f"results/train/{refs[a]}_s{seed}.json"} if a in refs else {}
                 out.append((f"S_{a}_s{seed}", "S", arms[a], seed, extra))

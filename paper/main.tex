@@ -253,10 +253,11 @@ seed and within noise of dense; it beats the plain thin gate of the same rank by
 range, so the per-unit self term is what the low-rank gate was missing. The silu-tied block and the shared
 gate were behind shrunk at 44\% of training and were stopped by a pre-registered rule (appendix). At a
 starved budget ($d_{\mathrm{ff}} = 400$ for shrunk, 600 for the silu-tied block) the two tie
-(Table~\ref{tab:starved}). \todo{Session 7 decides whether the gain belongs to the tie or to the relu:
-shrunk with a relu gate at 800 wide, the relu tie at the starved budget, and the relu tie at shrunk's own
-width. Rewrite this paragraph, the abstract and the title once that is in. Read and cite Primer (squared
-ReLU) and Shazeer 2020 first.}
+(Table~\ref{tab:starved}). \todo{The relu-tied block is exactly Primer's squared ReLU (So et al.\ 2021 state the equivalence with a
+weight-tied ReGLU) and its advantage over SwiGLU at equal parameters is reported there at 110M and in the
+xIELU paper at 1.1B; this paragraph must say so once both are read. What is ours: the controlled grid around
+it, the reason the low-rank gate fails, and the context-thresholded block (session 7: rank sweep of the
+context term at matched parameters, plus the relu-gate control).}
 
 \paragraph{Reading Exp.~A and Exp.~B together.} The projection that tolerates truncation best after
 training (the gate, Section~\ref{sec:expa}) is not the one that trains best at low rank (gate and
