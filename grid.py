@@ -14,6 +14,8 @@ Stages follow the day-by-day plan:
     screen  size S, seed 0: variants that might beat shrunk_r4 at the same parameter count (see screen_arms)
     screen2 size S, seeds 0-2: gates that are cheap in a different way (tied, thin+tied, shared) plus a
             starved-budget pair; every run carries a reference curve for the early-kill rule (see screen2_arms)
+    screen3 size S: the controls that say what the screen-2 win means (relu in a dense gate; the relu tie at
+            the starved budget, with low-rank context, and at 2/3 of the parameters), see screen3_arms
 
 Arms (r = rank, d = d_model, F = default d_ff):
     dense            standard SwiGLU
@@ -39,6 +41,14 @@ Screen 2 (matched to shrunk_r4 unless noted):
     thin_tied_gate_r4           rank d/4 gate plus a per-unit scale times the up pre-activation, d_ff 1024
     shared_gate                 one dense gate matrix for all layers, d_ff widened to 1104
     shrunk_w400 / tied_gate_w600   the starved-budget pair (460,800 params/layer each)
+
+Screen 3 (after the relu tie won screen 2 at three seeds):
+    shrunk_relu_r4              dense gate, relu instead of silu, d_ff 800: is the win the relu or the tie?
+    tied_gate_relu_w600         the winner at the starved budget (the silu tie only tied shrunk_w400 there)
+    thin_tied_relu_r4           the winner plus a rank d/4 context term
+    tied_gate                   the silu tie, rerun to the end under the loosened kill margins
+    tied_gate_relu_w800         diagnostic: the winner at shrunk's width, so 2/3 of shrunk's parameters
+    dense_relu                  diagnostic: dense SwiGLU with relu, the winner's activation at the dense budget
 """
 
 import argparse
@@ -116,6 +126,22 @@ def screen2_arms(size, K=4):
     }
 
 
+def screen3_arms(size, K=4):
+    """Controls for the screen-2 winner (tied_gate_relu). Priority order; seeds are set in runs_for."""
+    _, _, d, F = SIZES[size]
+    r = d // K
+    thin_params = 2 * d * F + r * (d + F)
+    Fs = round_to(thin_params / (3 * d), 8)                      # shrunk width, 800 at S
+    return {
+        f"shrunk_relu_r{K}": {"d_ff": Fs, "gate_act": "relu"},
+        "tied_gate_relu_w600": {"d_ff": 600, "gate_tie": "up", "gate_act": "relu"},
+        f"thin_tied_relu_r{K}": {"gate_rank": r, "gate_tie": "up", "gate_act": "relu"},
+        "tied_gate": {"d_ff": round_to(thin_params / (2 * d), 8), "gate_tie": "up"},
+        f"tied_gate_relu_w{Fs}": {"d_ff": Fs, "gate_tie": "up", "gate_act": "relu"},
+        "dense_relu": {"gate_act": "relu"},
+    }
+
+
 def mlp_params(size, arm):
     """MLP parameters per layer for an arm dict (the keys are train.py flags)."""
     L, _, d, F = SIZES[size]
@@ -167,6 +193,16 @@ def runs_for(stage):
     elif stage == "screen":
         arms = screen_arms("S")
         add("S", list(arms), [0], arms=arms)      # priority order: the launch deadline drops the tail
+    elif stage == "screen3":
+        arms = screen3_arms("S")
+        refs = {"shrunk_relu_r4": "S_shrunk_r4", "tied_gate_relu_w600": "S_shrunk_w400",
+                "thin_tied_relu_r4": "S_shrunk_r4", "tied_gate": "S_shrunk_r4"}
+        for seed in (0, 1, 2):
+            for a in arms:
+                if a.startswith(("tied_gate_relu_w8", "dense_relu")) and seed > 0:
+                    continue                                          # diagnostics: one seed
+                extra = {"ref_json": f"results/train/{refs[a]}_s{seed}.json"} if a in refs else {}
+                out.append((f"S_{a}_s{seed}", "S", arms[a], seed, extra))
     elif stage == "screen2":
         arms = screen2_arms("S")
         for seed in (0, 1, 2):                    # round 1 = every arm at seed 0, then seeds 1 and 2
@@ -199,7 +235,7 @@ if __name__ == "__main__":
         for size in SIZES:
             base = mlp_params(size, {})
             print(f"\nsize {size}: MLP parameters per layer (dense = {base:,})")
-            for name, arm in {**arms_for(size, (2, 4, 8)), **screen_arms(size), **screen2_arms(size)}.items():
+            for name, arm in {**arms_for(size, (2, 4, 8)), **screen_arms(size), **screen2_arms(size), **screen3_arms(size)}.items():
                 p = mlp_params(size, arm)
                 print(f"  {name:26s} {p:>10,}  ({100 * p / base:5.1f}% of dense)  {arm}")
         sys.exit()

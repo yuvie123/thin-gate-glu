@@ -11,7 +11,7 @@ import os
 import subprocess
 import sys
 
-from grid import arms_for, mlp_params, screen2_arms, screen_arms
+from grid import arms_for, mlp_params, screen2_arms, screen3_arms, screen_arms
 from model import GPT, GPTConfig, LowRankLinear, MonarchLinear, SwiGLU, _expand_groups, count_params
 from posthoc_truncate import factorize
 from train import SIZES, thin_gates
@@ -64,7 +64,7 @@ def test_param_counts_match_formula():
     for size, (L, H, d, F) in SIZES.items():
         if size == "L":
             continue                                    # skip the big one to keep the test fast
-        for name, arm in {**arms_for(size, (4,)), **screen_arms(size), **screen2_arms(size)}.items():
+        for name, arm in {**arms_for(size, (4,)), **screen_arms(size), **screen2_arms(size), **screen3_arms(size)}.items():
             counted = count_params(GPT(config_for(arm, L, H, d, F)))["mlp"]
             assert counted == L * mlp_params(size, arm), f"{size}/{name}: {counted} != formula"
 
@@ -89,6 +89,12 @@ def test_matched_arms_are_matched():
             gap = abs(mlp_params(size, s2[name]) - thin) / thin
             assert gap < 0.015, f"{size}/{name} differs from thin gate by {100 * gap:.2f}%"
         assert mlp_params(size, s2["shrunk_w400"]) == mlp_params(size, s2["tied_gate_w600"]), "starved pair not matched"
+        s3 = screen3_arms(size)
+        for name in ("shrunk_relu_r4", "thin_tied_relu_r4", "tied_gate"):
+            gap = abs(mlp_params(size, s3[name]) - thin) / thin
+            assert gap < 0.015, f"{size}/{name} differs from thin gate by {100 * gap:.2f}%"
+        assert mlp_params(size, s3["tied_gate_relu_w600"]) == mlp_params(size, s2["shrunk_w400"]), "starved pair not matched"
+        assert mlp_params(size, s3["dense_relu"]) == mlp_params(size, {}), "dense_relu must have the dense count"
 
 
 def test_model_is_causal():
