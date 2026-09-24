@@ -90,7 +90,7 @@ def test_matched_arms_are_matched():
             assert gap < 0.015, f"{size}/{name} differs from thin gate by {100 * gap:.2f}%"
         assert mlp_params(size, s2["shrunk_w400"]) == mlp_params(size, s2["tied_gate_w600"]), "starved pair not matched"
         s3 = screen3_arms(size)
-        for name in ("shrunk_relu_r4", "thin_tied_relu_r4", "tied_gate"):
+        for name in ("shrunk_relu_r4", "thin_tied_relu_r4", "tied_gate", "pair_tied_relu"):
             gap = abs(mlp_params(size, s3[name]) - thin) / thin
             assert gap < 0.015, f"{size}/{name} differs from thin gate by {100 * gap:.2f}%"
         assert mlp_params(size, s3["tied_gate_relu_w600"]) == mlp_params(size, s2["shrunk_w400"]), "starved pair not matched"
@@ -190,6 +190,22 @@ def test_tied_gate_forward():
         want = (fn(z) * z) @ m.down.weight.T
         assert torch.allclose(m(x), want, atol=1e-6), f"tied {act} forward differs from the hand computation"
     assert torch.allclose(torch.relu(z) * z, torch.relu(z) ** 2), "the relu tie is Primer's squared ReLU"
+
+
+def test_pair_tied_gate_forward():
+    """Partner-gated units: h_{2i} = act(z_{2i+1}) z_{2i}, h_{2i+1} = act(z_{2i}) z_{2i+1}; no gate parameters."""
+    torch.manual_seed(0)
+    L, H, d, F_ = 2, 2, 16, 24
+    m = SwiGLU(GPTConfig(n_layer=L, n_head=H, d_model=d, d_ff=F_, gate_tie="pair", gate_act="relu"))
+    assert m.gate is None and {n for n, _ in m.named_parameters()} == {"up.weight", "down.weight"}
+    x = torch.randn(3, 5, d)
+    z = x @ m.up.weight.T
+    h = torch.empty_like(z)
+    h[..., 0::2] = torch.relu(z[..., 1::2]) * z[..., 0::2]
+    h[..., 1::2] = torch.relu(z[..., 0::2]) * z[..., 1::2]
+    assert torch.allclose(m(x), h @ m.down.weight.T, atol=1e-6), "pair-tied forward differs from the hand computation"
+    # every unit's gate is a different direction from its content (unlike the self-tie)
+    assert not torch.allclose(m.up.weight[0], m.up.weight[1])
 
 
 def test_thin_tied_gate_reduces_to_thin_gate():

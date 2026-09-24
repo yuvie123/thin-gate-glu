@@ -49,9 +49,9 @@ def get_args():
     ap.add_argument("--bottleneck", default="linear", choices=["linear", "silu", "norm_silu"])
     ap.add_argument("--factor_wd", default="same", choices=["same", "half", "none"],
                     help="weight decay on low-rank / Monarch factors relative to --weight_decay")
-    ap.add_argument("--gate_tie", default="none", choices=["none", "up"],
+    ap.add_argument("--gate_tie", default="none", choices=["none", "up", "pair"],
                     help="up: the gate reuses the up-projection (h = act(z) * z); with --gate_rank a rank-r term "
-                         "and a per-unit scale are added to it")
+                         "and a per-unit scale are added to it. pair: units come in pairs, each gated by its partner")
     ap.add_argument("--gate_act", default="silu", choices=["silu", "relu"], help="activation on the gate")
     ap.add_argument("--gate_shared", type=int, default=0, help="1: one dense gate matrix shared by every layer")
     ap.add_argument("--ref_json", default="",

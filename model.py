@@ -42,7 +42,8 @@ class GPTConfig:
     lowrank_init: str = "balanced"   # "balanced" (random factors) or "spectral" (SVD of a random dense init)
     bottleneck: str = "linear"       # what sits between the two factors: "linear", "silu" or "norm_silu"
     gate_tie: str = "none"           # "up": the gate reuses the up-projection's weights (zero gate parameters);
-                                     # with gate_rank > 0 a rank-r term and a per-unit scale are added to it
+                                     # with gate_rank > 0 a rank-r term and a per-unit scale are added to it.
+                                     # "pair": hidden units come in pairs and each is gated by its partner
     gate_act: str = "silu"           # activation applied to the gate pre-activation: "silu" or "relu"
     gate_shared: int = 0             # 1: one dense gate matrix is shared by every layer
     rope_base: float = 10000.0
@@ -170,16 +171,19 @@ class SwiGLU(nn.Module):
         assert F_ % cfg.gate_groups == 0 and F_ % cfg.up_groups == 0 and F_ % cfg.down_groups == 0
         assert sum([cfg.gate_rank > 0, cfg.gate_groups > 1, cfg.gate_monarch > 0]) <= 1, "one gate structure at a time"
         assert not (cfg.up_rank > 0 and cfg.up_groups > 1) and not (cfg.down_rank > 0 and cfg.down_groups > 1)
-        assert cfg.gate_tie in ("none", "up") and cfg.gate_act in ("silu", "relu")
+        assert cfg.gate_tie in ("none", "up", "pair") and cfg.gate_act in ("silu", "relu")
+        assert not (cfg.gate_tie == "pair" and (cfg.gate_rank or F_ % 2)), "pair tie: no rank term, even d_ff"
         if cfg.gate_tie != "none" or cfg.gate_shared:
             assert cfg.gate_groups == 1 and cfg.gate_monarch == 0 and cfg.up_rank == 0 and cfg.up_groups == 1, \
                 "a tied or shared gate needs a plain up-projection and no other gate structure"
             assert not (cfg.gate_tie != "none" and cfg.gate_shared), "tied and shared are different arms"
         self.gate_groups, self.up_groups, self.down_groups = cfg.gate_groups, cfg.up_groups, cfg.down_groups
-        self.tied, self.act = cfg.gate_tie == "up", cfg.gate_act
+        self.tied, self.paired, self.act = cfg.gate_tie == "up", cfg.gate_tie == "pair", cfg.gate_act
         # GPT-2 style: shrink the init of layers that write into the residual stream
         down_std = std / math.sqrt(2 * cfg.n_layer)
-        if self.tied:
+        if self.paired:
+            self.gate = None                            # unit 2i is gated by z_{2i+1} and vice versa
+        elif self.tied:
             # the gate is the up-projection itself: h = act(z) * z with z = up(x). With a rank, a low-rank
             # term and a per-unit scale are added: g = B A x + tie_scale * z  (tie_scale starts at 1)
             self.gate = make_linear(d, F_, cfg.gate_rank, std, cfg.lowrank_init, cfg.bottleneck) if cfg.gate_rank else None
@@ -194,6 +198,12 @@ class SwiGLU(nn.Module):
         self.down = make_linear(F_ // cfg.down_groups, d, cfg.down_rank, down_std, cfg.lowrank_init, cfg.bottleneck)
 
     def forward(self, x):
+        if self.paired:
+            z = self.up(x).float()
+            a, b = z[..., 0::2], z[..., 1::2]
+            act = F.silu if self.act == "silu" else F.relu
+            h = torch.stack((act(b) * a, act(a) * b), dim=-1).flatten(-2)
+            return self.down(h.to(x.dtype))
         if self.tied:
             z = self.up(x).float()                      # float32: z * act(z) is quadratic and float16 tops out at |z| = 256
             g = z if self.gate is None else self.gate(x).float() + self.tie_scale * z

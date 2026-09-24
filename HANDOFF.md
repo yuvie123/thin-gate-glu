@@ -147,11 +147,12 @@ run log and the place where every decision is recorded.
 
 ### Next, in order
 1. ~~Sessions 2-6~~ done. `main_S` complete; screen 1 all dropped; screen 2: two winners.
-2. **Session 7 (built 2026-09-23, upload next): `cloud_notebook.ipynb` from `make_cloud_notebook.py --run
-   screen3`.** Priority: shrunk_relu_r4 x3, tied_gate_relu_w600 x3, thin_tied_relu_r4 x3, tied_gate (silu)
-   x3 rerun, then two one-seed diagnostics. About 8.5 h. Take in as usual; the reading depends on
-   shrunk_relu_r4: if it matches shrunk r4 the paper is "the gate's parameters are free"; if it matches the
-   relu tie, the paper is about the activation, with the tie as a free simplification.
+2. **Session 7 (rebuilt 2026-09-23 evening, upload next): `cloud_notebook.ipynb` from
+   `make_cloud_notebook.py --run screen3`.** Two new methods at three seeds (context-thresholded self-gating
+   `thin_tied_relu_r4`; partner-gated units `pair_tied_relu`), the control `shrunk_relu_r4` at three seeds,
+   then one-seed runs (relu tie at the starved budget, silu tie to the end, two diagnostics). 13 runs, about
+   8.5 h. Take in as usual; apply the promotion rule; the reading of the tie-versus-relu question depends on
+   `shrunk_relu_r4`. Priors and design in `notes.md` 2026-09-23 later.
 3. **Sun Sep 27, 6 pm: go / pivot / no-go.** The screen closed the "which structure on the gate" route. The
    data argue for the **contrast paper** (post-hoc tolerance does not predict trainability; Exp. A, B, C kept;
    retitle). If chosen, add `thin_up_r2/r8` and `thin_down_r2/r8` to `grid.py` (rerun `tests.py`) so Exp. B's

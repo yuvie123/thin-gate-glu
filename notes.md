@@ -967,3 +967,35 @@ runs, about 8.5 h on two T4s; the diagnostics run last and may fall past the dea
 `plot.py` regenerated: `training_screen.tex/pdf` (now with the two winners and shrunk r4 as reference),
 `training_starved.tex/pdf`, `paired.tex` (new pairs), `macros.tex`. The paper's Exp. B section now reports
 the win with the relu-versus-tie question marked open.
+
+### 2026-09-23, later: session 7 rebuilt around two new methods (decision, author: the next file must be new)
+
+The author asked that the next session carry a new, original method rather than a control of a known one.
+Screen 2 gives a small theory of the gate to build on: a low-rank gate fails because units lose their own
+keys; the silu self-gate fails because z^2 sigma(z) cannot switch a unit off; the relu self-gate wins because
+selection is hard and every unit keeps a full-rank key. Two methods follow from it, each at 921,600 MLP
+parameters per layer, each run at three seeds with the early-kill rule against the same-seed shrunk r4:
+
+1. **Context-thresholded self-gating** (`thin_tied_relu_r4`, d_ff 1024): h_i = relu(z_i + (BAx)_i) z_i with
+   z = Ux and BA of rank d/4. Every unit fires on its own pre-activation, and a rank-96 field of the input
+   moves each unit's threshold. This is the low-rank gate the paper set out to study, kept, but in the role
+   the data say it can fill: shared context, not selection. Contains the relu self-gate (BA = 0) at width
+   1024. Prior of beating shrunk r4 on the 3-seed paired mean: about 85%. Prior of beating the relu self-gate
+   at 1200 (i.e. context beats width): about 50%.
+2. **Partner-gated units** (`pair_tied_relu`, d_ff 1200): hidden units come in pairs (a, b) and each is gated
+   by the other: h_a = relu(b) a, h_b = relu(a) b. A GLU with zero gate parameters in which key and content
+   are different full-rank directions, so it keeps what a GLU has and the self-gate lacks. Prior of beating
+   shrunk: about 65%; of beating the relu self-gate: about 35%.
+
+Neither has been checked against the literature yet; the author's searches (`related.md`, "searches still to
+run") must cover "partner/cross gating", "adaptive thresholds", "squared ReLU with context" before either is
+called new in the paper.
+
+Kept: `shrunk_relu_r4` at three seeds, the control without which no claim about the tie is honest. Reduced to
+one seed this session: the relu tie at the starved budget, the silu tie rerun to the end, and the two
+diagnostics. 13 runs, about 8.5 h on two T4s; the deadline drops the tail.
+
+Pre-tests: `tests.py` 16/16 (new: the pair-tied forward against a hand computation, and the pair arm's
+parameter count); the baseline smoke curve is unchanged (`6.2531, 6.2524`); the pair-tied smoke trains; the
+Kaggle check step adds a compiled pair-tied smoke. Same honesty as before: no design can be guaranteed to beat
+shrunk; these two have the best-founded odds available, and the odds are on record before the runs.

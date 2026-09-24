@@ -112,7 +112,7 @@ def arm_of(name):            # "S_thin_gate_r4_s0" -> ("S", "thin_gate_r4")
 
 def arm_color(arm):
     if arm.startswith(("thin_gate", "reinvest", "monarch_gate", "grouped_gate", "bottleneck", "warm_gate",
-                       "tied_gate", "thin_tied", "shared_gate")):
+                       "tied_gate", "thin_tied", "shared_gate", "pair_tied")):
         return STYLE["gate_proj"][0]
     if arm.startswith(("thin_up", "grouped_up")):
         return STYLE["up_proj"][0]
@@ -160,6 +160,7 @@ def table_paired(by, out_dir):
              ("tied_gate_relu", "shrunk_r4"), ("tied_gate_relu", "dense"), ("thin_tied_gate_r4", "shrunk_r4"),
              ("thin_tied_gate_r4", "dense"), ("thin_tied_gate_r4", "thin_gate_r4"), ("tied_gate_relu", "thin_tied_gate_r4"),
              ("shrunk_relu_r4", "shrunk_r4"), ("tied_gate_relu", "shrunk_relu_r4"), ("thin_tied_relu_r4", "tied_gate_relu"),
+             ("thin_tied_relu_r4", "shrunk_r4"), ("pair_tied_relu", "shrunk_r4"), ("pair_tied_relu", "tied_gate_relu"),
              ("tied_gate", "shrunk_r4"), ("tied_gate_relu_w600", "shrunk_w400"), ("tied_gate_w600", "shrunk_w400")]
     lines = ["\\begin{tabular}{llrrrr}", "\\toprule",
              "Arm & minus & seed 0 & seed 1 & seed 2 & mean \\\\", "\\midrule"]
@@ -213,7 +214,7 @@ def write_macros(by, out_dir):
         macros["thinFracOfDense"] = f"{100 * t['mlp'] / S['dense'][0]['params']['mlp']:.0f}" if "dense" in S else "?"
     for arm in ("shrunk_r4", "thin_gate_r4", "thin_up_r4", "thin_down_r4", "shrunk_r2", "reinvest_r4", "all_lowrank_r4",
                 "tied_gate_relu", "thin_tied_gate_r4", "tied_gate", "shared_gate", "shrunk_w400", "tied_gate_w600",
-                "shrunk_relu_r4", "tied_gate_relu_w600", "thin_tied_relu_r4"):
+                "shrunk_relu_r4", "tied_gate_relu_w600", "thin_tied_relu_r4", "pair_tied_relu"):
         if arm in S:
             key = "".join(w.capitalize() for w in arm.split("_")).replace("2", "Two").replace("4", "Four").replace("8", "Eight").replace("600", "Sixh").replace("00", "h")
             macros[f"mean{key}"] = f"{m(arm):.4f}"

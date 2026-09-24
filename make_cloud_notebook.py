@@ -50,9 +50,9 @@ STEPS = {   # name -> (heading, command, note)
                 "S_shrunk_r4 s0/s1/s2 = 4.1043 / 4.1043 / 4.1124."),
     "screen3": ("Experiment B: screen 3, controls for the relu-tied gate (size S)",
                 "python cloud_run.py grid --stage screen3 --max_hours 11",
-                "shrunk_relu_r4 (three seeds) decides whether the screen-2 win is the relu or the tie; then the relu tie "
-                "at the starved budget, thin+tied with relu, the silu tie rerun to the end, and two one-seed "
-                "diagnostics (grid.py screen3_arms). References: S_shrunk_r4 s0/s1/s2 = 4.1043 / 4.1043 / 4.1124, "
+                "Two new methods at three seeds (context-thresholded self-gating: thin_tied_relu_r4; partner-gated "
+                "units: pair_tied_relu), the control shrunk_relu_r4 at three seeds, then one-seed runs: the relu tie at "
+                "the starved budget, the silu tie to the end, and two diagnostics (grid.py screen3_arms). References: S_shrunk_r4 s0/s1/s2 = 4.1043 / 4.1043 / 4.1124, "
                 "S_tied_gate_relu s0/s1/s2 = 4.0814 / 4.0757 / 4.0860, S_shrunk_w400 s0/s1/s2 = 4.1602 / 4.1535 / 4.1608."),
     "lr": ("Experiment B: learning-rate check", "python cloud_run.py grid --stage lr --max_hours 11", ""),
     "heal": ("Experiment C: truncate, then train only the new factors", "python cloud_run.py heal", ""),

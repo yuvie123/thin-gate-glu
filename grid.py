@@ -14,8 +14,8 @@ Stages follow the day-by-day plan:
     screen  size S, seed 0: variants that might beat shrunk_r4 at the same parameter count (see screen_arms)
     screen2 size S, seeds 0-2: gates that are cheap in a different way (tied, thin+tied, shared) plus a
             starved-budget pair; every run carries a reference curve for the early-kill rule (see screen2_arms)
-    screen3 size S: the controls that say what the screen-2 win means (relu in a dense gate; the relu tie at
-            the starved budget, with low-rank context, and at 2/3 of the parameters), see screen3_arms
+    screen3 size S: two new methods built on the screen-2 finding (context-thresholded self-gating, partner-gated
+            units), the control that says what the win means (relu in a dense gate), then diagnostics
 
 Arms (r = rank, d = d_model, F = default d_ff):
     dense            standard SwiGLU
@@ -43,10 +43,11 @@ Screen 2 (matched to shrunk_r4 unless noted):
     shrunk_w400 / tied_gate_w600   the starved-budget pair (460,800 params/layer each)
 
 Screen 3 (after the relu tie won screen 2 at three seeds):
-    shrunk_relu_r4              dense gate, relu instead of silu, d_ff 800: is the win the relu or the tie?
-    tied_gate_relu_w600         the winner at the starved budget (the silu tie only tied shrunk_w400 there)
-    thin_tied_relu_r4           the winner plus a rank d/4 context term
-    tied_gate                   the silu tie, rerun to the end under the loosened kill margins
+    thin_tied_relu_r4           NEW: context-thresholded self-gating, h = relu(z + BAx) z, rank d/4, d_ff 1024
+    pair_tied_relu              NEW: partner-gated units, h_a = relu(b) a and h_b = relu(a) b, zero gate params, d_ff 1200
+    shrunk_relu_r4              control: dense gate, relu instead of silu, d_ff 800: is the win the relu or the tie?
+    tied_gate_relu_w600         the winner at the starved budget (seed 0)
+    tied_gate                   the silu tie, rerun to the end under the loosened kill margins (seed 0)
     tied_gate_relu_w800         diagnostic: the winner at shrunk's width, so 2/3 of shrunk's parameters
     dense_relu                  diagnostic: dense SwiGLU with relu, the winner's activation at the dense budget
 """
@@ -132,11 +133,13 @@ def screen3_arms(size, K=4):
     r = d // K
     thin_params = 2 * d * F + r * (d + F)
     Fs = round_to(thin_params / (3 * d), 8)                      # shrunk width, 800 at S
+    Ft = round_to(thin_params / (2 * d), 8)
     return {
+        f"thin_tied_relu_r{K}": {"gate_rank": r, "gate_tie": "up", "gate_act": "relu"},
+        "pair_tied_relu": {"d_ff": Ft, "gate_tie": "pair", "gate_act": "relu"},
         f"shrunk_relu_r{K}": {"d_ff": Fs, "gate_act": "relu"},
         "tied_gate_relu_w600": {"d_ff": 600, "gate_tie": "up", "gate_act": "relu"},
-        f"thin_tied_relu_r{K}": {"gate_rank": r, "gate_tie": "up", "gate_act": "relu"},
-        "tied_gate": {"d_ff": round_to(thin_params / (2 * d), 8), "gate_tie": "up"},
+        "tied_gate": {"d_ff": Ft, "gate_tie": "up"},
         f"tied_gate_relu_w{Fs}": {"d_ff": Fs, "gate_tie": "up", "gate_act": "relu"},
         "dense_relu": {"gate_act": "relu"},
     }
@@ -149,7 +152,7 @@ def mlp_params(size, arm):
     total = 0
     for proj, (n_in, n_out) in (("gate", (d, F)), ("up", (d, F)), ("down", (F, d))):
         r, g, nb = arm.get(f"{proj}_rank", 0), arm.get(f"{proj}_groups", 1), arm.get(f"{proj}_monarch", 0)
-        if proj == "gate" and arm.get("gate_tie") == "up":
+        if proj == "gate" and arm.get("gate_tie") in ("up", "pair"):
             total += r * (n_in + n_out) + n_out if r else 0      # optional rank-r term plus a per-unit scale
         elif proj == "gate" and arm.get("gate_shared"):
             assert (n_in * n_out) % L == 0, "shared gate: d * d_ff must divide by the layer count"
@@ -195,12 +198,13 @@ def runs_for(stage):
         add("S", list(arms), [0], arms=arms)      # priority order: the launch deadline drops the tail
     elif stage == "screen3":
         arms = screen3_arms("S")
-        refs = {"shrunk_relu_r4": "S_shrunk_r4", "tied_gate_relu_w600": "S_shrunk_w400",
+        refs = {"shrunk_relu_r4": "S_shrunk_r4", "tied_gate_relu_w600": "S_shrunk_w400", "pair_tied_relu": "S_shrunk_r4",
                 "thin_tied_relu_r4": "S_shrunk_r4", "tied_gate": "S_shrunk_r4"}
+        three_seeds = ("thin_tied_relu_r4", "pair_tied_relu", "shrunk_relu_r4")
         for seed in (0, 1, 2):
             for a in arms:
-                if a.startswith(("tied_gate_relu_w8", "dense_relu")) and seed > 0:
-                    continue                                          # diagnostics: one seed
+                if a not in three_seeds and seed > 0:
+                    continue                                          # the rest: one seed this session
                 extra = {"ref_json": f"results/train/{refs[a]}_s{seed}.json"} if a in refs else {}
                 out.append((f"S_{a}_s{seed}", "S", arms[a], seed, extra))
     elif stage == "screen2":
