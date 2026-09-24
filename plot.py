@@ -156,7 +156,11 @@ def table_paired(by, out_dir):
     """Seed-paired gaps (arm minus its budget twin, same seed): the comparison the paper rests on."""
     pairs = [(f"thin_gate_r{K}", f"shrunk_r{K}") for K in (2, 4, 8)] + \
             [("thin_up_r4", "shrunk_r4"), ("thin_down_r4", "shrunk_r4"), ("thin_gate_r4", "thin_up_r4"),
-             ("reinvest_r4", "dense"), ("shrunk_r2", "dense")]
+             ("reinvest_r4", "dense"), ("shrunk_r2", "dense"),
+             ("tied_gate_relu", "shrunk_r4"), ("tied_gate_relu", "dense"), ("thin_tied_gate_r4", "shrunk_r4"),
+             ("thin_tied_gate_r4", "dense"), ("thin_tied_gate_r4", "thin_gate_r4"), ("tied_gate_relu", "thin_tied_gate_r4"),
+             ("shrunk_relu_r4", "shrunk_r4"), ("tied_gate_relu", "shrunk_relu_r4"), ("thin_tied_relu_r4", "tied_gate_relu"),
+             ("tied_gate", "shrunk_r4"), ("tied_gate_relu_w600", "shrunk_w400"), ("tied_gate_w600", "shrunk_w400")]
     lines = ["\\begin{tabular}{llrrrr}", "\\toprule",
              "Arm & minus & seed 0 & seed 1 & seed 2 & mean \\\\", "\\midrule"]
     for size, arms in by.items():
@@ -207,9 +211,11 @@ def write_macros(by, out_dir):
         t = S["thin_gate_r4"][0]["params"]
         macros["thinMLPperLayer"] = f"{t['mlp'] // c['n_layer']:,}"
         macros["thinFracOfDense"] = f"{100 * t['mlp'] / S['dense'][0]['params']['mlp']:.0f}" if "dense" in S else "?"
-    for arm in ("shrunk_r4", "thin_gate_r4", "thin_up_r4", "thin_down_r4", "shrunk_r2", "reinvest_r4", "all_lowrank_r4"):
+    for arm in ("shrunk_r4", "thin_gate_r4", "thin_up_r4", "thin_down_r4", "shrunk_r2", "reinvest_r4", "all_lowrank_r4",
+                "tied_gate_relu", "thin_tied_gate_r4", "tied_gate", "shared_gate", "shrunk_w400", "tied_gate_w600",
+                "shrunk_relu_r4", "tied_gate_relu_w600", "thin_tied_relu_r4"):
         if arm in S:
-            key = "".join(w.capitalize() for w in arm.split("_")).replace("2", "Two").replace("4", "Four").replace("8", "Eight")
+            key = "".join(w.capitalize() for w in arm.split("_")).replace("2", "Two").replace("4", "Four").replace("8", "Eight").replace("600", "Sixh").replace("00", "h")
             macros[f"mean{key}"] = f"{m(arm):.4f}"
     # the largest parameter mismatch between an arm and its budget twin, in percent
     if "thin_gate_r4" in S:

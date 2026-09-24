@@ -2,6 +2,8 @@
 \toprule
 Size & Arm & MLP params & Val. loss (mean $\pm$ std) & Seeds & Tokens/s \\
 \midrule
+S & tied gate relu & 5,529,600 & 4.0810 $\pm$ 0.0052 & 3 & 67,103 \\
+S & thin tied gate r4 & 5,535,744 & 4.0907 $\pm$ 0.0043 & 3 & 65,129 \\
 S & shrunk r4 & 5,529,600 & 4.1070 $\pm$ 0.0047 & 3 & 61,663 \\
 S & thin gate r4 spectral nowd & 5,529,600 & 4.1127 $\pm$ n/a & 1 & 59,956 \\
 S & bottleneck norm gate r4 & 5,530,176 & 4.1140 $\pm$ n/a & 1 & 59,918 \\

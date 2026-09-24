@@ -234,12 +234,29 @@ ends at \meanReinvestRFour{}, within the dense seed range. Spending the gate's s
 nor clearly loses to dense.
 
 \paragraph{Alternatives to a low-rank gate.} Because a rank-$r$ gate confines every unit's key to one
-$r$-dimensional subspace, we also screened, at the same parameter count and seed 0, gates that are cheap in
-other ways: a block-structured (Monarch) gate, a gate with one value per four hidden units, a rank-$r$
-gate with a spectral initialisation or without weight decay on its factors, a nonlinear two-layer gate, and
-a dense gate truncated to rank $r$ part-way through training. None ends below shrunk
-(Appendix, Table~\ref{tab:screen}); the spread of the whole set is smaller than the dense seed range, so
-they cannot be ranked against one another at one seed. \todo{Add the screen-2 arms (tied, shared) once run.}
+$r$-dimensional subspace, we also screened, at the same parameter count, gates that are cheap in other
+ways. A first group (seed 0 only) changed the low-rank gate's initialisation or weight decay, made it
+block-structured (Monarch), let one gate value serve four hidden units, inserted a nonlinearity between the
+factors, or truncated a dense gate part-way through training; none ends below shrunk (Appendix,
+Table~\ref{tab:screen}). A second group removed the gate's parameters instead of reducing their rank:
+\emph{tied} gates reuse the up-projection, $\mathrm{FFN}(\vx) = \mW_{\mathrm{down}}(\phi(\vz) \odot \vz)$
+with $\vz = \mW_{\mathrm{up}}\vx$, so every unit gates itself and the saved parameters widen the block to
+$d_{\mathrm{ff}} = 1200$; \emph{thin+tied} adds a per-unit multiple of $\vz$ to a rank-$r$ gate at the
+original width; a \emph{shared} gate uses one gate matrix for all layers.
+
+\paragraph{A gate without parameters beats the narrower dense block.} With $\phi = \mathrm{relu}$, so that
+each hidden unit computes $\mathrm{relu}(z)^2$, the tied block ends at \meanTiedGateRelu{} against
+\meanShrunkRFour{} for shrunk, ahead at every seed by more than twice the largest thin-gate deficit
+(Table~\ref{tab:paired}), and it is also ahead of the dense block at every seed with 78\% of its MLP
+parameters. Thin+tied with $\phi = \mathrm{silu}$ ends at \meanThinTiedGateRFour{}, ahead of shrunk at every
+seed and within noise of dense; it beats the plain thin gate of the same rank by more than the dense seed
+range, so the per-unit self term is what the low-rank gate was missing. The silu-tied block and the shared
+gate were behind shrunk at 44\% of training and were stopped by a pre-registered rule (appendix). At a
+starved budget ($d_{\mathrm{ff}} = 400$ for shrunk, 600 for the silu-tied block) the two tie
+(Table~\ref{tab:starved}). \todo{Session 7 decides whether the gain belongs to the tie or to the relu:
+shrunk with a relu gate at 800 wide, the relu tie at the starved budget, and the relu tie at shrunk's own
+width. Rewrite this paragraph, the abstract and the title once that is in. Read and cite Primer (squared
+ReLU) and Shazeer 2020 first.}
 
 \paragraph{Reading Exp.~A and Exp.~B together.} The projection that tolerates truncation best after
 training (the gate, Section~\ref{sec:expa}) is not the one that trains best at low rank (gate and
@@ -344,10 +361,20 @@ exact repository names and configurations in the appendix.
 \begin{table}[h]
   \centering
   \caption{Screened alternatives to a low-rank gate at the parameter count of thin-gate $r/d = 1/4$, size S,
-  seed 0, with shrunk $r/d = 1/4$ (three seeds) as the reference. None ends below shrunk.}
+  with shrunk $r/d = 1/4$ as the reference. Arms with one seed are from the first screen; the tied and
+  thin+tied blocks have three seeds. Arms stopped by the early-kill rule are not listed.}
   \label{tab:screen}
   \small
   \input{tables/training_screen.tex}
+\end{table}
+
+\begin{table}[h]
+  \centering
+  \caption{The starved budget, 460,800 MLP parameters per layer: a dense block at $d_{\mathrm{ff}} = 400$
+  against the silu-tied block at 600. Three seeds each.}
+  \label{tab:starved}
+  \small
+  \input{tables/training_starved.tex}
 \end{table}
 
 \begin{table}[h]

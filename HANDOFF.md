@@ -136,15 +136,22 @@ run log and the place where every decision is recorded.
   (variants at seed 0, shrunk r4 as reference) and, once run, `training_starved`. Compiles with tectonic;
   8 pages with an empty bibliography. Remaining `\todo`s need reading (citations), size M, Exp. C, bench.
 
+- **2026-09-23: Kaggle session 6 taken in. Screen 2: the relu-tied gate (h = relu(z)^2, 1200 wide, zero
+  gate parameters) beats shrunk r4 at every seed by 0.023 to 0.029 and beats dense at every seed with 78%
+  of its MLP parameters (mean 4.0810 vs shrunk 4.1070 vs dense 4.0942).** Thin+tied (silu) also wins vs
+  shrunk (-0.016) and ties dense. The silu tie and the shared gate were killed at step 2000; the silu tie
+  ties shrunk at the starved budget. **Open question that session 7 decides: is the win the relu or the
+  tie?** (`shrunk_relu_r4` control). Table and reading in `notes.md` 2026-09-23. Session 7 notebook built
+  (`--run screen3`, 14 runs). The Sep 27 decision now has a positive candidate: "the gate's parameters are
+  free" if the control comes out for the tie, or a paper about the activation if it comes out for relu.
+
 ### Next, in order
-1. ~~Session 2: pilot~~, ~~Session 3: main_S key arms~~, ~~Session 4: screen~~ (all dropped),
-   ~~Session 5: main_S rest~~ done 2026-09-22. `main_S` is complete.
-2. **Session 6 (built 2026-09-22, upload next): `cloud_notebook.ipynb` from `make_cloud_notebook.py --run
-   screen2`.** 18 runs with the early-kill rule; round 1 (seed 0 of all six) is about 4.2 h on two T4s if
-   nothing is killed, the rest follows until the launch deadline. Take in as usual, then apply the promotion
-   rule in `notes.md` 2026-09-22 evening (win: paired 3-seed mean at or below -0.005 with all pairs negative).
-   Compute: Kaggle quota is used up this week; Colab runs the same notebook; the local RTX 3070 works if the
-   shrunk references are rerun there first.
+1. ~~Sessions 2-6~~ done. `main_S` complete; screen 1 all dropped; screen 2: two winners.
+2. **Session 7 (built 2026-09-23, upload next): `cloud_notebook.ipynb` from `make_cloud_notebook.py --run
+   screen3`.** Priority: shrunk_relu_r4 x3, tied_gate_relu_w600 x3, thin_tied_relu_r4 x3, tied_gate (silu)
+   x3 rerun, then two one-seed diagnostics. About 8.5 h. Take in as usual; the reading depends on
+   shrunk_relu_r4: if it matches shrunk r4 the paper is "the gate's parameters are free"; if it matches the
+   relu tie, the paper is about the activation, with the tie as a free simplification.
 3. **Sun Sep 27, 6 pm: go / pivot / no-go.** The screen closed the "which structure on the gate" route. The
    data argue for the **contrast paper** (post-hoc tolerance does not predict trainability; Exp. A, B, C kept;
    retitle). If chosen, add `thin_up_r2/r8` and `thin_down_r2/r8` to `grid.py` (rerun `tests.py`) so Exp. B's

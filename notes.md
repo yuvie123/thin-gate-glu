@@ -905,3 +905,65 @@ because results are never pooled across GPUs.
 `plot.py` gained `tables/paired.tex`, `tables/macros.tex` and the main / screen / starved split of the
 training outputs; `paper/main.tex` gained the Exp. B setup paragraph and the results subsection (numbers only
 through macros and `\input` tables). Compiles with tectonic, 8 pages. Nothing cited yet (rule 1).
+
+## 2026-09-23
+
+### 2026-09-23: Kaggle session 6 taken in: screen 2, the relu-tied gate beats shrunk at every seed
+
+Zip renamed `thin_gate_results_session6_screen2.zip` (browser name `thin_gate_results (5).zip`). Session ran
+16:47 UTC Sep 22 to 00:58 UTC Sep 23, 8.2 h, on the notebook built *before* the kill margins were loosened,
+so this session used 0.010 / 0.008. Checks ok: `tests.py` 15/15, all eleven smokes including the kill-rule
+smoke. 14 runs finished `[ok]` (two of them killed at step 2000), 6 `[skip]` (seeds 1-2 of the two killed
+arms), nothing failed; no nan, inf or overflow; the largest |Ux| in any run is 9.4 (float16 limit 256). 90
+files; the 60 carried result files came back byte-identical; 14 new files committed in `results/train/`.
+
+| Arm | d_ff | MLP params | s0 | s1 | s2 | mean | vs shrunk r4, paired | rule |
+|---|---|---|---|---|---|---|---|---|
+| tied_gate_relu (h = relu(z)^2) | 1200 | 5,529,600 | 4.0814 | 4.0757 | 4.0860 | 4.0810 | -0.023 / -0.029 / -0.026, mean **-0.026** | **WIN** |
+| thin_tied_gate_r4 (silu; rank 96 + z) | 1024 | 5,535,744 | 4.0906 | 4.0865 | 4.0950 | 4.0907 | -0.014 / -0.018 / -0.017, mean **-0.016** | **WIN** |
+| tied_gate (silu, h = silu(z) z) | 1200 | 5,529,600 | killed at step 2000, +0.012 behind | | | | | undecided (see below) |
+| shared_gate | 1104 | 5,511,168 | killed at step 2000, +0.021 behind | | | | | drop |
+| shrunk_w400 (reference) | 400 | 2,764,800 | 4.1602 | 4.1535 | 4.1608 | 4.1582 | | |
+| tied_gate_w600 (silu) | 600 | 2,764,800 | 4.1569 | 4.1609 | 4.1582 | 4.1587 | -0.003 / +0.007 / -0.003 vs shrunk_w400, mean +0.001 | tie |
+| dense (for reference) | 1024 | 7,077,888 | 4.0867 | 4.0834 | 4.1125 | 4.0942 | | |
+
+**Promotion rule applied (fixed 2026-09-22 evening: win = paired 3-seed mean at or below -0.005 with all
+three pairs negative).** Two arms win. The relu-tied gate is ahead of shrunk r4 by 0.023 to 0.029 at every
+seed, about three times the largest thin-gate deficit, and it is **also ahead of dense at every seed**
+(-0.005 / -0.008 / -0.027, mean -0.013) with 78% of the dense MLP parameters. It led from the first eval
+onwards (0.05 ahead of shrunk at step 1000, narrowing to 0.023 at the end), so the kill rule was never close.
+Thin+tied (silu) is ahead of shrunk at every seed by 0.014 to 0.018 and ties dense (+0.004 / +0.003 /
+-0.017); it beats the plain thin gate r4 by 0.028 on the mean, so the per-unit self term is what the thin gate
+was missing. The relu tie beats thin+tied by 0.009 to 0.011 at every seed.
+
+**What is not settled, stated plainly.**
+
+- **Is the win the relu or the tie?** The silu tie was 0.012 behind shrunk at step 2000 and was stopped
+  (under the loosened margins it would have continued to the step-3000 check); the relu tie is 0.03 ahead at
+  the same point. The only difference between them is relu(z) versus silu(z) on the gate side of the product.
+  So either "a squared relu unit" or "a relu gate" could be the active ingredient. Session 7 runs the control
+  that decides it: `shrunk_relu_r4` (dense gate, relu, 800 wide, same parameters). If it matches shrunk, the
+  win belongs to the tie-plus-width; if it matches the relu tie, the win is the activation and the tie merely
+  costs nothing.
+- **The starved pair is a tie, with the silu tie.** Given the relu result, `tied_gate_relu_w600` is the arm
+  that should have been there; it runs in session 7.
+- **Prior work.** relu(z)^2 in the feed-forward block is Primer's squared ReLU (So et al. 2021, arXiv
+  2109.08668); a squared-relu block at 1.5x width against a SwiGLU block at equal parameters is a known
+  comparison in small-scale practice. The framing here (the gate's parameters removed, every unit gating
+  itself; the low-rank gate rescued by a self term) and the controlled grid around it are what the paper can
+  claim. Shazeer 2020 and Primer must be read before any of this is written up as a claim (rule 1).
+- One session, one size, one token budget. Size M is still unrun.
+
+Session 6 used the old margins, so the 0.010 kill of the silu tie stands as recorded (`S_tied_gate_s0.json`
+with `killed`, committed in this take-in). For session 7 that file is removed from the tree so the runner
+reruns the arm under the loosened margins; the killed record stays in git history.
+
+**Session 7 (`--run screen3`, built tonight), in priority order:** shrunk_relu_r4 x3 (the deciding control),
+tied_gate_relu_w600 x3 (the winner at the starved budget), thin_tied_relu_r4 x3 (winner plus rank-96 context),
+tied_gate silu x3 (rerun to the end), tied_gate_relu_w800 x1 (the winner at shrunk's width, 2/3 of its
+parameters: is the gate worth anything?), dense_relu x1 (the winner's activation at the dense budget). 14
+runs, about 8.5 h on two T4s; the diagnostics run last and may fall past the deadline.
+
+`plot.py` regenerated: `training_screen.tex/pdf` (now with the two winners and shrunk r4 as reference),
+`training_starved.tex/pdf`, `paired.tex` (new pairs), `macros.tex`. The paper's Exp. B section now reports
+the win with the relu-versus-tie question marked open.
