@@ -48,6 +48,9 @@ Screen 3 (after the relu tie won screen 2 at three seeds; the relu tie itself is
                                 is tied_gate_relu, already run). The rank sweep is the experiment: how much shared
                                 context does self-gating need?
     shrunk_relu_r4              control: dense gate, relu instead of silu, d_ff 800: is the win the relu or the tie?
+    thin_gate_relu_r4           control: the rank d/4 gate with relu and NO self term: is the tie necessary?
+    thin_tied_relu_r4_zero      the core arm with the context factor B initialised at zero (starts as squared ReLU)
+    thin_tied_relu_r4_affine    the core arm plus a per-unit threshold and a per-unit linear bypass (both init 0)
     pair_tied_relu              (code path kept, not run: a fixed-mask special case of Masked GLU, arXiv 2506.23225)
     tied_gate_relu_w600         the winner at the starved budget (seed 0)
     tied_gate                   the silu tie, rerun to the end under the loosened kill margins (seed 0)
@@ -141,11 +144,15 @@ def screen3_arms(size, K=4):
     def tied_width(rank):        # rank * (d + F) + 2 * d * F + F = thin_params, rounded to 8
         return round_to((thin_params - rank * d) / (rank + 2 * d + 1), 8)
 
+    Fa = round_to((thin_params - r * d) / (r + 2 * d + 3), 8)   # affine: rank term + scale + bias + bypass
     return {
         f"thin_tied_relu_r{K}": {"gate_rank": r, "gate_tie": "up", "gate_act": "relu"},
         f"shrunk_relu_r{K}": {"d_ff": Fs, "gate_act": "relu"},
+        f"thin_gate_relu_r{K}": {"gate_rank": r, "gate_act": "relu"},
         f"thin_tied_relu_r{2 * K}": {"gate_rank": d // (2 * K), "d_ff": tied_width(d // (2 * K)), "gate_tie": "up", "gate_act": "relu"},
         f"thin_tied_relu_r{K // 2}": {"gate_rank": d // (K // 2), "d_ff": tied_width(d // (K // 2)), "gate_tie": "up", "gate_act": "relu"},
+        f"thin_tied_relu_r{K}_zero": {"gate_rank": r, "gate_tie": "up", "gate_act": "relu", "lowrank_init": "zero"},
+        f"thin_tied_relu_r{K}_affine": {"gate_rank": r, "d_ff": Fa, "gate_tie": "up", "gate_act": "relu", "gate_bias": 1, "gate_bypass": 1},
         "pair_tied_relu": {"d_ff": Ft, "gate_tie": "pair", "gate_act": "relu"},
         "tied_gate_relu_w600": {"d_ff": 600, "gate_tie": "up", "gate_act": "relu"},
         "tied_gate": {"d_ff": Ft, "gate_tie": "up"},
@@ -163,6 +170,7 @@ def mlp_params(size, arm):
         r, g, nb = arm.get(f"{proj}_rank", 0), arm.get(f"{proj}_groups", 1), arm.get(f"{proj}_monarch", 0)
         if proj == "gate" and arm.get("gate_tie") in ("up", "pair"):
             total += r * (n_in + n_out) + n_out if r else 0      # optional rank-r term plus a per-unit scale
+            total += n_out * (bool(arm.get("gate_bias")) + bool(arm.get("gate_bypass")))
         elif proj == "gate" and arm.get("gate_shared"):
             assert (n_in * n_out) % L == 0, "shared gate: d * d_ff must divide by the layer count"
             total += n_in * n_out // L                           # one matrix, charged evenly to the layers
@@ -208,14 +216,20 @@ def runs_for(stage):
     elif stage == "screen3":
         arms = screen3_arms("S")
         refs = {"shrunk_relu_r4": "S_shrunk_r4", "tied_gate_relu_w600": "S_shrunk_w400", "thin_tied_relu_r8": "S_shrunk_r4",
-                "thin_tied_relu_r4": "S_shrunk_r4", "thin_tied_relu_r2": "S_shrunk_r4", "tied_gate": "S_shrunk_r4"}
+                "thin_tied_relu_r4": "S_shrunk_r4", "thin_tied_relu_r2": "S_shrunk_r4", "tied_gate": "S_shrunk_r4",
+                "thin_gate_relu_r4": "S_shrunk_r4", "thin_tied_relu_r4_zero": "S_shrunk_r4", "thin_tied_relu_r4_affine": "S_shrunk_r4"}
         three_seeds = ("thin_tied_relu_r4", "shrunk_relu_r4")
+        tail = ("tied_gate_relu_w600", "tied_gate", "tied_gate_relu_w800", "dense_relu")
+        order = [a for a in arms if a not in tail and a != "pair_tied_relu"]
         for seed in (0, 1, 2):
-            for a in arms:
-                if a == "pair_tied_relu" or (a not in three_seeds and seed > 0):
+            for a in order:
+                if a not in three_seeds and seed > 0:
                     continue                                          # the rest: one seed this session
                 extra = {"ref_json": f"results/train/{refs[a]}_s{seed}.json"} if a in refs else {}
                 out.append((f"S_{a}_s{seed}", "S", arms[a], seed, extra))
+        for a in tail:                                                # diagnostics last, seed 0 only
+            extra = {"ref_json": f"results/train/{refs[a]}_s0.json"} if a in refs else {}
+            out.append((f"S_{a}_s0", "S", arms[a], 0, extra))
     elif stage == "screen2":
         arms = screen2_arms("S")
         for seed in (0, 1, 2):                    # round 1 = every arm at seed 0, then seeds 1 and 2

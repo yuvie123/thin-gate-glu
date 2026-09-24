@@ -6,6 +6,7 @@ If any of these fail, do not trust experiment numbers until it is fixed.
 
 import torch
 
+import dataclasses
 import json
 import os
 import subprocess
@@ -90,7 +91,8 @@ def test_matched_arms_are_matched():
             assert gap < 0.015, f"{size}/{name} differs from thin gate by {100 * gap:.2f}%"
         assert mlp_params(size, s2["shrunk_w400"]) == mlp_params(size, s2["tied_gate_w600"]), "starved pair not matched"
         s3 = screen3_arms(size)
-        for name in ("shrunk_relu_r4", "thin_tied_relu_r4", "thin_tied_relu_r8", "thin_tied_relu_r2", "tied_gate", "pair_tied_relu"):
+        for name in ("shrunk_relu_r4", "thin_tied_relu_r4", "thin_tied_relu_r8", "thin_tied_relu_r2", "tied_gate", "pair_tied_relu",
+                     "thin_gate_relu_r4", "thin_tied_relu_r4_zero", "thin_tied_relu_r4_affine"):
             gap = abs(mlp_params(size, s3[name]) - thin) / thin
             assert gap < 0.015, f"{size}/{name} differs from thin gate by {100 * gap:.2f}%"
         assert mlp_params(size, s3["tied_gate_relu_w600"]) == mlp_params(size, s2["shrunk_w400"]), "starved pair not matched"
@@ -206,6 +208,26 @@ def test_pair_tied_gate_forward():
     assert torch.allclose(m(x), h @ m.down.weight.T, atol=1e-6), "pair-tied forward differs from the hand computation"
     # every unit's gate is a different direction from its content (unlike the self-tie)
     assert not torch.allclose(m.up.weight[0], m.up.weight[1])
+
+
+def test_zero_init_and_affine_start_as_the_self_gate():
+    """B = 0 makes thin+tied identical to the plain tie at init; bias and bypass at 0 change nothing until learned."""
+    torch.manual_seed(0)
+    L, H, d, F_, r = 2, 2, 16, 24, 4
+    base = GPTConfig(n_layer=L, n_head=H, d_model=d, d_ff=F_, gate_tie="up", gate_act="relu")
+    tie = SwiGLU(base)
+    zero = SwiGLU(dataclasses.replace(base, gate_rank=r, lowrank_init="zero"))
+    affine = SwiGLU(dataclasses.replace(base, gate_rank=r, lowrank_init="zero", gate_bias=1, gate_bypass=1))
+    for m in (zero, affine):
+        m.up.load_state_dict(tie.up.state_dict()); m.down.load_state_dict(tie.down.state_dict())
+    assert torch.all(zero.gate.B.weight == 0) and zero.gate.A.weight.abs().sum() > 0
+    x = torch.randn(3, 5, d)
+    assert torch.allclose(zero(x), tie(x), atol=1e-6), "zero-init context must start as the plain self-gate"
+    assert torch.allclose(affine(x), tie(x), atol=1e-6), "zero bias and bypass must start as the plain self-gate"
+    n_tie = sum(p.numel() for p in tie.parameters())
+    assert sum(p.numel() for p in affine.parameters()) == n_tie + r * (d + F_) + 3 * F_
+    affine(x).sum().backward()
+    assert affine.gate.B.weight.grad.abs().sum() > 0 and affine.gate_bypass.grad.abs().sum() > 0, "both learn from step 1"
 
 
 def test_thin_tied_gate_reduces_to_thin_gate():

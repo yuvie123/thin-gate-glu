@@ -50,9 +50,10 @@ STEPS = {   # name -> (heading, command, note)
                 "S_shrunk_r4 s0/s1/s2 = 4.1043 / 4.1043 / 4.1124."),
     "screen3": ("Experiment B: screen 3, controls for the relu-tied gate (size S)",
                 "python cloud_run.py grid --stage screen3 --max_hours 11",
-                "Context-thresholded self-gating h = relu(z + BAx) z at rank d/4 (three seeds) and at ranks d/8 and d/2 "
-                "(seed 0), all at shrunk_r4's parameters; the control shrunk_relu_r4 at three seeds; then one-seed runs: "
-                "the relu tie at the starved budget, the silu tie to the end, and two diagnostics (grid.py screen3_arms). References: S_shrunk_r4 s0/s1/s2 = 4.1043 / 4.1043 / 4.1124, "
+                "Context-thresholded self-gating h = relu(z + BAx) z at rank d/4 (three seeds) and at ranks d/8 and d/2, "
+                "its zero-init and affine variants, the controls shrunk_relu_r4 (three seeds) and thin_gate_relu_r4 (relu "
+                "low-rank gate without the tie), then one-seed diagnostics (grid.py screen3_arms). All at shrunk_r4's "
+                "parameters unless noted. References: S_shrunk_r4 s0/s1/s2 = 4.1043 / 4.1043 / 4.1124, "
                 "S_tied_gate_relu s0/s1/s2 = 4.0814 / 4.0757 / 4.0860, S_shrunk_w400 s0/s1/s2 = 4.1602 / 4.1535 / 4.1608."),
     "lr": ("Experiment B: learning-rate check", "python cloud_run.py grid --stage lr --max_hours 11", ""),
     "heal": ("Experiment C: truncate, then train only the new factors", "python cloud_run.py heal", ""),

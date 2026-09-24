@@ -39,13 +39,16 @@ class GPTConfig:
     up_groups: int = 1           # g > 1: the up-projection has d_ff/g outputs, each repeated g times
     down_groups: int = 1         # g > 1: g neighbouring hidden units are averaged before the down-projection
     gate_monarch: int = 0        # nb > 0: the gate is a Monarch matrix with nb blocks (full rank, few parameters)
-    lowrank_init: str = "balanced"   # "balanced" (random factors) or "spectral" (SVD of a random dense init)
+    lowrank_init: str = "balanced"   # "balanced" (random factors), "spectral" (SVD of a random dense init) or
+                                     # "zero" (A random, B = 0: the product starts at zero and is learned)
     bottleneck: str = "linear"       # what sits between the two factors: "linear", "silu" or "norm_silu"
     gate_tie: str = "none"           # "up": the gate reuses the up-projection's weights (zero gate parameters);
                                      # with gate_rank > 0 a rank-r term and a per-unit scale are added to it.
                                      # "pair": hidden units come in pairs and each is gated by its partner
     gate_act: str = "silu"           # activation applied to the gate pre-activation: "silu" or "relu"
     gate_shared: int = 0             # 1: one dense gate matrix is shared by every layer
+    gate_bias: int = 0               # tied gates: 1 adds a per-unit threshold b to the gate pre-activation (init 0)
+    gate_bypass: int = 0             # tied gates: 1 adds a per-unit beta to act(g), so h = z (act(g) + beta) (init 0)
     rope_base: float = 10000.0
     init_std: float = 0.02
 
@@ -70,7 +73,7 @@ class LowRankLinear(nn.Module):
 
     def __init__(self, in_features, out_features, rank, init_std=0.02, init="balanced", bottleneck="linear"):
         super().__init__()
-        assert init in ("balanced", "spectral"), init
+        assert init in ("balanced", "spectral", "zero"), init
         assert bottleneck in ("linear", "silu", "norm_silu"), bottleneck
         self.A = nn.Linear(in_features, rank, bias=False)
         self.B = nn.Linear(rank, out_features, bias=False)
@@ -81,7 +84,9 @@ class LowRankLinear(nn.Module):
         s = (init_std ** 2 / rank) ** 0.25
         nn.init.normal_(self.A.weight, std=s)
         nn.init.normal_(self.B.weight, std=s)
-        if init == "spectral":
+        if init == "zero":
+            nn.init.zeros_(self.B.weight)
+        elif init == "spectral":
             # Start from the best rank-r approximation of a dense random init. Note that this product has a
             # smaller Frobenius norm than a dense init (only the top r singular directions are kept).
             A, B = svd_factors(torch.randn(out_features, in_features) * init_std, rank)
@@ -179,6 +184,8 @@ class SwiGLU(nn.Module):
             assert not (cfg.gate_tie != "none" and cfg.gate_shared), "tied and shared are different arms"
         self.gate_groups, self.up_groups, self.down_groups = cfg.gate_groups, cfg.up_groups, cfg.down_groups
         self.tied, self.paired, self.act = cfg.gate_tie == "up", cfg.gate_tie == "pair", cfg.gate_act
+        self.gate_bias = self.gate_bypass = None
+        assert not ((cfg.gate_bias or cfg.gate_bypass) and cfg.gate_tie != "up"), "gate_bias / gate_bypass are for tied gates"
         # GPT-2 style: shrink the init of layers that write into the residual stream
         down_std = std / math.sqrt(2 * cfg.n_layer)
         if self.paired:
@@ -188,6 +195,8 @@ class SwiGLU(nn.Module):
             # term and a per-unit scale are added: g = B A x + tie_scale * z  (tie_scale starts at 1)
             self.gate = make_linear(d, F_, cfg.gate_rank, std, cfg.lowrank_init, cfg.bottleneck) if cfg.gate_rank else None
             self.tie_scale = nn.Parameter(torch.ones(F_)) if cfg.gate_rank else None
+            self.gate_bias = nn.Parameter(torch.zeros(F_)) if cfg.gate_bias else None
+            self.gate_bypass = nn.Parameter(torch.zeros(F_)) if cfg.gate_bypass else None
         elif shared_gate is not None:
             self.gate = shared_gate                     # the same nn.Linear object in every layer
         elif cfg.gate_monarch:
@@ -207,8 +216,11 @@ class SwiGLU(nn.Module):
         if self.tied:
             z = self.up(x).float()                      # float32: z * act(z) is quadratic and float16 tops out at |z| = 256
             g = z if self.gate is None else self.gate(x).float() + self.tie_scale * z
+            if self.gate_bias is not None:
+                g = g + self.gate_bias
             act = F.silu if self.act == "silu" else F.relu
-            return self.down((act(g) * z).to(x.dtype))
+            a = act(g) if self.gate_bypass is None else act(g) + self.gate_bypass
+            return self.down((a * z).to(x.dtype))
         g = _expand_groups(self.gate(x), self.gate_groups)
         u = _expand_groups(self.up(x), self.up_groups)
         h = F.silu(g) * u if self.act == "silu" else F.relu(g) * u

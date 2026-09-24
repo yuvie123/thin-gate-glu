@@ -152,8 +152,9 @@ run log and the place where every decision is recorded.
 ### Next, in order
 1. ~~Sessions 2-6~~ done. `main_S` complete; screen 1 all dropped; screen 2: two winners.
 2. **Session 7 (rebuilt 2026-09-24 after the novelty search, upload next): `make_cloud_notebook.py --run
-   screen3`, 12 runs, about 8 h.** Context-thresholded self-gating at three context ranks (matched parameters;
-   rank 96 at three seeds), the `shrunk_relu_r4` control at three seeds, then one-seed diagnostics. The
+   screen3`, 15 runs, about 9 h.** Context-thresholded self-gating at three context ranks (matched parameters;
+   rank 96 at three seeds) plus zero-init and affine variants, the controls `shrunk_relu_r4` (three seeds) and
+   `thin_gate_relu_r4` (no self term), then one-seed diagnostics. Table in `notes.md` 2026-09-24 later. The
    search found: the relu tie is Primer's squared ReLU (not new; keep as anchor and control), the pair tie is a
    special case of Masked GLU (dropped), the context-thresholded block was not found (candidate contribution,
    author to re-search). Details in `notes.md` 2026-09-24 and `related.md`.

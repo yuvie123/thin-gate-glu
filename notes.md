@@ -1038,3 +1038,45 @@ full-rank per-unit keys (thin fails), hard selection (silu tie fails), and how m
 `visibility: PUBLIC`; the search engine had indexed it with the "CPAL 2027 submission" description). The
 project rule says it must stay private until reviews finish. The assistant did not change it (the rule also
 says never to touch visibility); the author decides today.
+
+### 2026-09-24, later: session 7 hardened (author: every modification that raises the odds; make it new)
+
+Position, stated before the run. A block that beats shrunk already exists (the relu self-gate, which is Primer's
+squared ReLU). The new object is the self-gate whose threshold is moved by a rank-r context, h = relu(z + BAx) z,
+and it answers the paper's own title: a gate of rank d/4 is enough *if each unit also gates itself*. The plain
+thin gate lost by 0.011; the same low-rank term as a threshold field on a self-gate is the candidate. Everything
+below makes that arm as strong as it can be and the comparison airtight. Nothing can be guaranteed; the odds are
+on record.
+
+**Session 7, final (15 runs, in this order; the deadline drops the tail):**
+
+| # | Arm | d_ff | MLP params | Purpose |
+|---|---|---|---|---|
+| 1 | thin_tied_relu_r4 s0 | 1024 | 922,624 | the core arm (balanced init) |
+| 2 | shrunk_relu_r4 s0 | 800 | 921,600 | control: ReGLU at 800; is the screen-2 win the relu alone? |
+| 3 | thin_gate_relu_r4 s0 | 1024 | 921,600 | control: rank-96 relu gate WITHOUT the self term; is the tie necessary? |
+| 4 | thin_tied_relu_r8 s0 | 1104 | 920,400 | rank sweep: less context, more width |
+| 5 | thin_tied_relu_r2 s0 | 880 | 919,408 | rank sweep: more context, less width |
+| 6 | thin_tied_relu_r4_zero s0 | 1024 | 922,624 | B = 0 init: starts as exact squared ReLU, learns the context |
+| 7 | thin_tied_relu_r4_affine s0 | 1024 | 924,672 | + per-unit threshold and per-unit linear bypass (both init 0; the bypass is the ingredient xIELU found worth 0.014 at 1.1B) |
+| 8-11 | thin_tied_relu_r4 s1, s2; shrunk_relu_r4 s1, s2 | | | seeds for the core arm and its control |
+| 12-15 | tied_gate_relu_w600, tied_gate (silu, rerun), tied_gate_relu_w800, dense_relu, all s0 | | | diagnostics |
+
+With rank 0 = tied_gate_relu (1200, done) the sweep has four points at one parameter count.
+
+**Pre-tests on the Mac.** `tests.py` 17/17 (new: zero-init and affine variants equal the plain self-gate at init
+and both receive gradient from step 1). Baseline smoke curve unchanged (`6.2531, 6.2524`). Affine smoke trains.
+Initialisation statistics at size S (random tokens, layer 0): gate pre-activation std 0.39 for the ties and
+0.56 for balanced-init context (the low-rank term adds a same-variance component; the zero-init arm removes it),
+50% of units active in every variant, output std within 2x of the relu tie. No arm starts in a bad regime.
+The Kaggle check step runs the affine/zero smoke compiled on the GPU.
+
+**Odds (assistant's, before the run):** core arm beats shrunk on the 3-seed paired mean, ~85%; at least one
+context arm beats the rank-0 relu tie at seed 0 (context beats width), ~60%; the affine arm is the single
+most likely to do so, ~50% on its own. The four-point curve is informative either way: flat means "width is
+all you need once units self-gate", rising toward rank 96 means "context is worth more than width".
+
+**What "minor breakthrough" can mean at 28M parameters:** a new block that beats SwiGLU at 78% of its MLP
+parameters with two matmuls instead of three, with a mechanistic account (full-rank per-unit keys, hard
+selection, a measured amount of shared context) and controls for every ingredient. Not more than that until
+size M repeats it.

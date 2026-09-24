@@ -162,6 +162,8 @@ def table_paired(by, out_dir):
              ("shrunk_relu_r4", "shrunk_r4"), ("tied_gate_relu", "shrunk_relu_r4"), ("thin_tied_relu_r4", "tied_gate_relu"),
              ("thin_tied_relu_r4", "shrunk_r4"), ("thin_tied_relu_r8", "shrunk_r4"), ("thin_tied_relu_r2", "shrunk_r4"),
              ("thin_tied_relu_r8", "tied_gate_relu"), ("thin_tied_relu_r2", "tied_gate_relu"), ("dense_relu", "dense"),
+             ("thin_gate_relu_r4", "shrunk_r4"), ("thin_tied_relu_r4_zero", "thin_tied_relu_r4"),
+             ("thin_tied_relu_r4_affine", "thin_tied_relu_r4"), ("thin_tied_relu_r4_affine", "tied_gate_relu"),
              ("tied_gate", "shrunk_r4"), ("tied_gate_relu_w600", "shrunk_w400"), ("tied_gate_w600", "shrunk_w400")]
     lines = ["\\begin{tabular}{llrrrr}", "\\toprule",
              "Arm & minus & seed 0 & seed 1 & seed 2 & mean \\\\", "\\midrule"]

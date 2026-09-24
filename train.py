@@ -45,7 +45,7 @@ def get_args():
     ap.add_argument("--up_groups", type=int, default=1)
     ap.add_argument("--down_groups", type=int, default=1)
     ap.add_argument("--gate_monarch", type=int, default=0, help="nb > 0: Monarch gate with nb blocks")
-    ap.add_argument("--lowrank_init", default="balanced", choices=["balanced", "spectral"])
+    ap.add_argument("--lowrank_init", default="balanced", choices=["balanced", "spectral", "zero"])
     ap.add_argument("--bottleneck", default="linear", choices=["linear", "silu", "norm_silu"])
     ap.add_argument("--factor_wd", default="same", choices=["same", "half", "none"],
                     help="weight decay on low-rank / Monarch factors relative to --weight_decay")
@@ -54,6 +54,8 @@ def get_args():
                          "and a per-unit scale are added to it. pair: units come in pairs, each gated by its partner")
     ap.add_argument("--gate_act", default="silu", choices=["silu", "relu"], help="activation on the gate")
     ap.add_argument("--gate_shared", type=int, default=0, help="1: one dense gate matrix shared by every layer")
+    ap.add_argument("--gate_bias", type=int, default=0, help="tied gates: 1 adds a per-unit threshold (init 0)")
+    ap.add_argument("--gate_bypass", type=int, default=0, help="tied gates: 1 adds a per-unit linear bypass (init 0)")
     ap.add_argument("--ref_json", default="",
                     help="a finished run's JSON; at each --kill_steps step this run stops early if its validation "
                          "loss is above the reference's at the same step by more than the margin")
@@ -193,6 +195,7 @@ def main():
         gate_groups=args.gate_groups, up_groups=args.up_groups, down_groups=args.down_groups,
         gate_monarch=args.gate_monarch, lowrank_init=args.lowrank_init, bottleneck=args.bottleneck,
         gate_tie=args.gate_tie, gate_act=args.gate_act, gate_shared=args.gate_shared,
+        gate_bias=args.gate_bias, gate_bypass=args.gate_bypass,
     )
     if args.thin_at > 0:
         assert 0 < args.thin_at < 1 and args.gate_rank > 0, "--thin_at needs 0 < f < 1 and a --gate_rank target"
