@@ -248,16 +248,33 @@ original width; a \emph{shared} gate uses one gate matrix for all layers.
 each hidden unit computes $\mathrm{relu}(z)^2$, the tied block ends at \meanTiedGateRelu{} against
 \meanShrunkRFour{} for shrunk, ahead at every seed by more than twice the largest thin-gate deficit
 (Table~\ref{tab:paired}), and it is also ahead of the dense block at every seed with 78\% of its MLP
-parameters. Thin+tied with $\phi = \mathrm{silu}$ ends at \meanThinTiedGateRFour{}, ahead of shrunk at every
-seed and within noise of dense; it beats the plain thin gate of the same rank by more than the dense seed
-range, so the per-unit self term is what the low-rank gate was missing. The silu-tied block and the shared
-gate were behind shrunk at 44\% of training and were stopped by a pre-registered rule (appendix). At a
-starved budget ($d_{\mathrm{ff}} = 400$ for shrunk, 600 for the silu-tied block) the two tie
-(Table~\ref{tab:starved}). \todo{The relu-tied block is exactly Primer's squared ReLU (So et al.\ 2021 state the equivalence with a
-weight-tied ReGLU) and its advantage over SwiGLU at equal parameters is reported there at 110M and in the
-xIELU paper at 1.1B; this paragraph must say so once both are read. What is ours: the controlled grid around
-it, the reason the low-rank gate fails, and the context-thresholded block (session 7: rank sweep of the
-context term at matched parameters, plus the relu-gate control).}
+parameters. This block is the squared-ReLU feed-forward layer of Primer, which is a weight-tied ReGLU;
+\todo{cite So et al.\ 2021 and the xIELU paper once read; both report the same ordering at 110M and 1.1B}
+our contribution is the controlled comparison around it. Three controls say what the gain is not. It is not
+the relu: a dense gate with relu (ReGLU) at the shrunk width ends at \meanShrunkReluRFour{}, behind the SwiGLU
+block at every seed, and the tied block beats it by more than 0.03 at every seed. It is not the width alone:
+the silu-tied block at the same width ends level with shrunk. And it is not the low rank: a rank-$r$ relu gate
+without the self term was more than 0.02 behind shrunk at 44\% of training and was stopped.
+
+\paragraph{Context is worth less than width.} Adding a rank-$r$ term to the self-gate, so that each unit fires
+when $z_i + (\mB\mA\vx)_i > 0$, gives a family of blocks at one parameter count in which the rank of the
+context term trades against the width (Figure~\ref{fig:context_rank}). At rank $d/4$ this block ends at
+\meanThinTiedReluRFour{}, ahead of shrunk at every seed and within noise of dense, and it beats the plain
+low-rank gate of the same rank by more than the dense seed range: the self term is what the low-rank gate was
+missing. But the curve is monotone: every parameter moved from width into context costs loss, and the rank-0
+block is the best of the family. Zero-initialising the context, and adding a per-unit threshold and a linear
+bypass, change nothing beyond noise. At a starved budget ($d_{\mathrm{ff}} = 400$ for shrunk) the relu
+self-gate at $d_{\mathrm{ff}} = 600$ is ahead by 0.02 at one seed (Table~\ref{tab:starved}), five times its
+margin at the main budget. \todo{seeds 1-2 of the starved pair; size M.}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.5\linewidth]{figures/context_rank.pdf}
+  \caption{Relu self-gate with a rank-$r$ context term, all at the parameter count of shrunk $r/d = 1/4$
+  (the width shrinks as the rank grows; labels give $d_{\mathrm{ff}}$). Bands: range of the shrunk and dense
+  seeds. More context, less width, higher loss.}
+  \label{fig:context_rank}
+\end{figure}
 
 \paragraph{Reading Exp.~A and Exp.~B together.} The projection that tolerates truncation best after
 training (the gate, Section~\ref{sec:expa}) is not the one that trains best at low rank (gate and

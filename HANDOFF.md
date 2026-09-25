@@ -149,15 +149,20 @@ run log and the place where every decision is recorded.
   (`--run screen3`, 14 runs). The Sep 27 decision now has a positive candidate: "the gate's parameters are
   free" if the control comes out for the tie, or a paper about the activation if it comes out for relu.
 
+- **2026-09-25: Kaggle session 7 taken in (15 runs, all finished).** Context-thresholded self-gating (rank 96)
+  beats shrunk at every seed (mean -0.014) but loses to the rank-0 relu self-gate at the same parameters (mean
+  +0.012); the rank sweep is monotone: width beats context. Controls: the self term is necessary (rank-96 relu
+  gate without it was killed at +0.021), relu hurts in an ordinary gate (ReGLU 800 is 0.009 behind SwiGLU 800 at
+  every seed), the silu self-gate ties shrunk exactly, init/affine variants are noise, the relu self-gate wins
+  the starved budget by 0.022. **The paper is now a controlled answer to "what does a GLU gate need?" with
+  Primer's squared ReLU as the anchor, not a new block.** Reading in `notes.md` 2026-09-25.
+
 ### Next, in order
-1. ~~Sessions 2-6~~ done. `main_S` complete; screen 1 all dropped; screen 2: two winners.
-2. **Session 7 (rebuilt 2026-09-24 after the novelty search, upload next): `make_cloud_notebook.py --run
-   screen3`, 15 runs, about 9 h.** Context-thresholded self-gating at three context ranks (matched parameters;
-   rank 96 at three seeds) plus zero-init and affine variants, the controls `shrunk_relu_r4` (three seeds) and
-   `thin_gate_relu_r4` (no self term), then one-seed diagnostics. Table in `notes.md` 2026-09-24 later. The
-   search found: the relu tie is Primer's squared ReLU (not new; keep as anchor and control), the pair tie is a
-   special case of Masked GLU (dropped), the context-thresholded block was not found (candidate contribution,
-   author to re-search). Details in `notes.md` 2026-09-24 and `related.md`.
+1. ~~Sessions 2-7~~ done. `main_S` complete; screens 1-3 done; every question at size S answered.
+2. **No notebook is built.** The next GPU work is **size M**: measure throughput at M first (`cloud_run.py
+   throughput` is S-only and needs a `--size` flag), set `TOKENS["M"]`, rerun `tests.py`, then `main_M` with
+   dense, shrunk_r4, tied_gate_relu and thin_tied_relu_r4 at two seeds. That is the experiment that decides
+   whether the size-S story holds. Seeds 1-2 of the starved pair (relu) are the cheap add-on.
 3. **Sun Sep 27, 6 pm: go / pivot / no-go.** The screen closed the "which structure on the gate" route. The
    data argue for the **contrast paper** (post-hoc tolerance does not predict trainability; Exp. A, B, C kept;
    retitle). If chosen, add `thin_up_r2/r8` and `thin_down_r2/r8` to `grid.py` (rerun `tests.py`) so Exp. B's

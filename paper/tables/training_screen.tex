@@ -4,10 +4,18 @@ Size & Arm & MLP params & Val. loss (mean $\pm$ std) & Seeds & Tokens/s \\
 \midrule
 S & tied gate relu & 5,529,600 & 4.0810 $\pm$ 0.0052 & 3 & 67,103 \\
 S & thin tied gate r4 & 5,535,744 & 4.0907 $\pm$ 0.0043 & 3 & 65,129 \\
+S & thin tied relu r4 & 5,535,744 & 4.0927 $\pm$ 0.0076 & 3 & 58,854 \\
+S & thin tied relu r4 zero & 5,535,744 & 4.0959 $\pm$ n/a & 1 & 57,353 \\
+S & thin tied relu r4 affine & 5,548,032 & 4.0963 $\pm$ n/a & 1 & 60,755 \\
+S & thin tied relu r8 & 5,522,400 & 4.0972 $\pm$ n/a & 1 & 56,772 \\
+S & dense relu & 7,077,888 & 4.0983 $\pm$ n/a & 1 & 56,571 \\
+S & thin tied relu r2 & 5,516,448 & 4.1028 $\pm$ n/a & 1 & 62,368 \\
+S & tied gate & 5,529,600 & 4.1043 $\pm$ n/a & 1 & 58,267 \\
 S & shrunk r4 & 5,529,600 & 4.1070 $\pm$ 0.0047 & 3 & 61,663 \\
 S & thin gate r4 spectral nowd & 5,529,600 & 4.1127 $\pm$ n/a & 1 & 59,956 \\
 S & bottleneck norm gate r4 & 5,530,176 & 4.1140 $\pm$ n/a & 1 & 59,918 \\
 S & thin gate r4 spectral & 5,529,600 & 4.1146 $\pm$ n/a & 1 & 60,108 \\
+S & shrunk relu r4 & 5,529,600 & 4.1157 $\pm$ 0.0012 & 3 & 62,801 \\
 S & grouped gate g4 & 5,515,776 & 4.1175 $\pm$ n/a & 1 & 60,160 \\
 S & grouped up g4 & 5,515,776 & 4.1225 $\pm$ n/a & 1 & 59,316 \\
 S & monarch gate b2 narrow & 5,511,168 & 4.1243 $\pm$ n/a & 1 & 57,868 \\

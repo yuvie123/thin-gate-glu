@@ -1080,3 +1080,61 @@ all you need once units self-gate", rising toward rank 96 means "context is wort
 parameters with two matmuls instead of three, with a mechanistic account (full-rank per-unit keys, hard
 selection, a measured amount of shared context) and controls for every ingredient. Not more than that until
 size M repeats it.
+
+### 2026-09-25: Kaggle session 7 taken in: the self-gate wins; context is worth less than width
+
+Zip renamed `thin_gate_results_session7_screen3.zip` (browser name `thin_gate_results (6).zip`). Session ran
+04:06 to 14:23 UTC Sep 24, 10.3 h; checks ok (`tests.py` 17/17, all thirteen smokes). All 15 runs finished (14
+`[ok]`, `thin_gate_relu_r4` killed at step 2000 as designed); no nan, inf or overflow; largest |Ux| 14.2. 105
+files; 73 carried result files byte-identical; 15 new files committed.
+
+| Arm | d_ff | s0 | s1 | s2 | mean | paired vs shrunk r4 | rule |
+|---|---|---|---|---|---|---|---|
+| thin_tied_relu_r4 (relu(z + BAx) z, rank 96) | 1024 | 4.0996 | 4.0941 | 4.0845 | 4.0927 | -0.005 / -0.010 / -0.028, mean **-0.014** | **WIN vs shrunk** |
+| shrunk_relu_r4 (ReGLU at 800) | 800 | 4.1165 | 4.1163 | 4.1144 | 4.1157 | +0.012 / +0.012 / +0.002, mean +0.009 | worse than SwiGLU shrunk |
+| tied_gate_relu (reference, session 6) | 1200 | 4.0814 | 4.0757 | 4.0860 | 4.0810 | | |
+| shrunk_r4 / dense (references) | 800 / 1024 | | | | 4.1070 / 4.0942 | | |
+
+Seed-0 arms: thin_tied_relu_r8 (rank 48, d_ff 1104) 4.0972; thin_tied_relu_r2 (rank 192, d_ff 880) 4.1028;
+zero-init 4.0959 and affine 4.0963 (both within 0.004 of the balanced arm at 4.0996: noise); thin_gate_relu_r4
+(rank-96 relu gate, no self term) killed at step 2000 at +0.021; the silu tie rerun to the end lands at 4.1043,
+exactly shrunk s0 (it was +0.012 behind at step 2000 and +0.001 at 3000: the loosened margin was right, the
+old one had killed it); tied_gate_relu_w600 4.1382 vs shrunk_w400 4.1602 (**-0.022** at the starved budget);
+tied_gate_relu_w800 4.1181 (2/3 of shrunk's parameters, +0.014 behind it); dense_relu (ReGLU at 1024) 4.0983
+vs dense 4.0867 (+0.012).
+
+**Promotion rule:** context-thresholded self-gating at rank 96 **wins against shrunk** (all three pairs negative,
+mean -0.014) and ties dense (mean -0.002, two pairs positive). But it **loses to the rank-0 relu self-gate at the
+same parameter count** (+0.018 / +0.018 / -0.002, mean +0.012), and the seed-0 rank sweep is monotone: rank 0 at
+1200 wide 4.081, rank 48 at 1104 4.097, rank 96 at 1024 4.100, rank 192 at 880 4.103. **Every parameter spent on
+shared context would have been better spent on width.** The candidate contribution is a valid block that beats
+shrunk, but not a better block than the one Primer already has.
+
+**What the controls settle, stated plainly.**
+
+- **The tie is necessary.** The rank-96 relu gate without the self term was 0.021 behind shrunk at 44% and was
+  stopped; with the self term the same rank is 0.014 ahead of shrunk at the end. The self term is worth about
+  0.03 to a low-rank gate.
+- **Relu is not the ingredient.** In an ordinary gate relu hurts: ReGLU at 800 is 0.009 behind SwiGLU at 800 at
+  every seed, and ReGLU at 1024 is 0.012 behind SwiGLU at 1024. The relu self-gate beats ReGLU at equal
+  parameters by 0.035 at every seed. What works is hard selection on the unit's own pre-activation, plus the
+  width the missing gate matrix pays for.
+- **The silu self-gate ties shrunk exactly** at 1200 wide and the relu self-gate beats it by 0.023. Selection
+  must switch units off.
+- **Init and affine terms do not matter** (zero-init, threshold, bypass: all within noise at seed 0).
+- **Where width is scarce the effect grows:** at the starved budget the relu self-gate at 600 beats the dense
+  block at 400 by 0.022 (seed 0), five times the gap the silu tie showed there.
+- Twice the self-gate at 2/3 of shrunk's parameters (800 wide) is only 0.014 behind shrunk.
+
+**What the paper is now (for the Sep 27 decision, author's call).** Not a new block. A controlled answer to "what
+does a GLU gate need?": (1) post-hoc rank tolerance does not predict trainability (Exp. A vs B); (2) a low-rank
+gate fails because units lose their own keys, and every structural fix at the same budget (13 in screen 1) fails
+with it; (3) the gate's parameters are unnecessary: a unit gating itself with relu (Primer's squared ReLU) beats
+SwiGLU at 78% of its MLP parameters, and every other use of those parameters tried here (low-rank context at
+three ranks, affine terms, a shared gate, a silu self-gate) is worth less than width; (4) relu helps only as a
+self-gate, not in an ordinary gate; (5) the advantage grows as width gets scarce. The title's question gets a
+sharp answer: the gate needs no rank at all, it needs the unit itself. Everything rests on one size and one token
+budget; size M is the experiment that would make this solid.
+
+Regenerated: `figures/context_rank.pdf` (now four points), `training_screen`, `training_starved`, `paired.tex`,
+`macros.tex`. The paper's Exp. B paragraph is rewritten below the same date.
