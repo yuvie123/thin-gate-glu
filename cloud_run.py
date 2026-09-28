@@ -270,17 +270,23 @@ def compile_flag():
 def cmd_throughput(args):
     from grid import TOKENS
     ensure_data(args.dry)
-    expected = os.path.join("results", "scratch", "throughput_check.json")
-    cmd = [sys.executable, "train.py", "--name", "throughput_check", "--size", "S", "--tokens", "20e6",
+    size = args.size
+    tag = "throughput_check" if size == "S" else f"throughput_check_{size}"
+    expected = os.path.join("results", "scratch", f"{tag}.json")
+    cmd = [sys.executable, "train.py", "--name", tag, "--size", size, "--tokens", "20e6",
            "--out_dir", "results/scratch"] + compile_flag()
-    run_units([[("throughput_check", cmd, expected)]], args.dry)
+    run_units([[(tag, cmd, expected)]], args.dry)
     if args.dry or not os.path.exists(expected):
         return
     with open(expected) as f:
         tps = json.load(f)["tokens_per_second"]
-    hours = TOKENS["S"] / tps / 3600
+    hours = TOKENS[size] / tps / 3600
     n, _, _ = gpu_info()
-    say(f"{tps:,.0f} tokens/s -> one size-S run of {TOKENS['S'] / 1e6:.0f}M tokens takes about {hours:.1f} h")
+    say(f"{tps:,.0f} tokens/s -> one size-{size} run of {TOKENS[size] / 1e6:.0f}M tokens takes about {hours:.1f} h")
+    if size != "S":
+        say(f"size {size}: if this is over about 2.6 h the main_{size} grid that follows will overrun its launch "
+            f"deadline; lower TOKENS['{size}'] in grid.py and rebuild before running it again")
+        return
     say(f"the 6 pilot runs on {max(1, n)} GPU(s) would take about {hours * -(-6 // max(1, n)):.1f} h")
     if hours > 1.5:
         say("That is over the ~1.5 h budget. STOP here and lower TOKENS['S'] in grid.py BEFORE any pilot run:")
@@ -326,6 +332,7 @@ if __name__ == "__main__":
     ap.add_argument("what", choices=["check", "posthoc", "throughput", "pilot", "grid", "heal", "bench", "pack"])
     ap.add_argument("--models", default="", help="posthoc: comma-separated subset of the model list")
     ap.add_argument("--stage", default="pilot", help="grid: which grid.py stage to run")
+    ap.add_argument("--size", default="S", help="throughput: model size to time")
     ap.add_argument("--dry", action="store_true")
     ap.add_argument("--max_hours", type=float, default=0.0,
                     help="stop starting new jobs once this many hours minus --job_hours have passed (0 = no cap). "

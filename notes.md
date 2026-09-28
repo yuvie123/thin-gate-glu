@@ -1138,3 +1138,16 @@ budget; size M is the experiment that would make this solid.
 
 Regenerated: `figures/context_rank.pdf` (now four points), `training_screen`, `training_starved`, `paired.tex`,
 `macros.tex`. The paper's Exp. B paragraph is rewritten below the same date.
+
+### 2026-09-27: session 8 built: size M (decision, assistant, on the author's request for the next file)
+
+The size-S questions are answered; the one experiment that decides whether the story holds is size M
+(8 layers, d 512, d_ff 1344; about 25M non-embedding parameters). Four arms, seeds 0-1, key arms first: dense,
+shrunk_r4 (d_ff 1048), tied_gate_relu (d_ff 1576), thin_tied_relu_r4 (rank 128, d_ff 1344), all matched within
+0.35%. **TOKENS["M"] is set to 200M**, an estimate from the size-S throughput (63k tok/s) scaled by the FLOP ratio
+(about 2.7x, so about 23k tok/s and 2.4 h per run): six to eight runs fit one session. Rule 3 says measure before
+setting, so the notebook's first step is `cloud_run.py throughput --size M` (new `--size` flag), which prints the
+hours per run; if it says more than about 2.6 h, the author stops the session, lowers TOKENS["M"], rebuilds and
+reruns; the grid step uses `--job_hours 2.8` so no run can start too late to finish inside the commit. No
+reference curves exist at M, so the kill rule is off. `cloud_run.py throughput` for S is unchanged (same file
+name). Tests 17/17.

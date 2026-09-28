@@ -65,7 +65,10 @@ import sys
 
 from train import SIZES
 
-TOKENS = {"S": 300e6, "M": 500e6, "L": 1000e6}
+TOKENS = {"S": 300e6, "M": 200e6, "L": 1000e6}
+# M: 200M is an estimate set on 2026-09-27 from the size-S throughput (63k tok/s) scaled by the FLOP ratio
+# (about 2.7x), i.e. roughly 23k tok/s -> 2.4 h per run, so six runs fit one Kaggle session. The session's own
+# throughput step prints the measured figure; if a run would take over 2.6 h, lower this BEFORE main_M runs.
 
 
 def round_to(x, m):
@@ -206,8 +209,11 @@ def runs_for(stage):
         add("S", key, [0, 1, 2])          # most important arms first, so partial grids are still usable
         add("S", rest, [0, 1, 2])
     elif stage == "main_M":
-        add("M", ["dense", "thin_gate_r4", "thin_up_r4", "thin_down_r4", "shrunk_r4"], [0, 1])
-        add("M", ["reinvest_r4", "thin_gate_r8"], [0, 1])
+        # after screens 1-3 the question at M is only: does the self-gate story hold? Four arms, key ones first.
+        arms = {**arms_for("M", (4,)), **screen2_arms("M"), **screen3_arms("M")}
+        for seed in (0, 1):
+            for a in ("dense", "shrunk_r4", "tied_gate_relu", "thin_tied_relu_r4"):
+                out.append((f"M_{a}_s{seed}", "M", arms[a], seed, {}))
     elif stage == "big_L":
         add("L", ["dense", "thin_gate_r4"], [0], extra={"micro_bs": 4})
     elif stage == "screen":

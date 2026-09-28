@@ -37,7 +37,13 @@ STEPS = {   # name -> (heading, command, note)
     "pilot": ("Experiment B: pilot runs", "python cloud_run.py pilot",
               "Dense (two seeds, which gives the noise floor), shrunk, thin-gate, thin-up, thin-down at size S."),
     "main_S": ("Experiment B: all arms at size S, three seeds", "python cloud_run.py grid --stage main_S --max_hours 11", ""),
-    "main_M": ("Experiment B: key arms at size M, two seeds", "python cloud_run.py grid --stage main_M --max_hours 11", ""),
+    "throughput_M": ("Speed check at size M", "python cloud_run.py throughput --size M",
+                     "Times the size-M model on 20M tokens and prints the hours per run at TOKENS['M']. If it says more "
+                     "than about 2.6 h per run, stop, lower TOKENS['M'] in grid.py, rebuild, and run again."),
+    "main_M": ("Experiment B at size M: dense, shrunk, relu self-gate, rank-d/4 context, two seeds",
+               "python cloud_run.py grid --stage main_M --max_hours 11 --job_hours 2.8",
+               "Eight runs at 200M tokens, key arms first; the launch deadline drops whatever does not fit. "
+               "Same recipe as size S; no reference curves at M yet, so the kill rule is off."),
     "screen": ("Experiment B: screen of gate variants at the shrunk_r4 budget (size S, seed 0)",
                "python cloud_run.py grid --stage screen --max_hours 11",
                "Thirteen variants in priority order (grid.py screen_arms); the launch deadline drops the tail. "

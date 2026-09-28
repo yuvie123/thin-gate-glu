@@ -159,10 +159,11 @@ run log and the place where every decision is recorded.
 
 ### Next, in order
 1. ~~Sessions 2-7~~ done. `main_S` complete; screens 1-3 done; every question at size S answered.
-2. **No notebook is built.** The next GPU work is **size M**: measure throughput at M first (`cloud_run.py
-   throughput` is S-only and needs a `--size` flag), set `TOKENS["M"]`, rerun `tests.py`, then `main_M` with
-   dense, shrunk_r4, tied_gate_relu and thin_tied_relu_r4 at two seeds. That is the experiment that decides
-   whether the size-S story holds. Seeds 1-2 of the starved pair (relu) are the cheap add-on.
+2. **Session 8 (built 2026-09-27, upload next): `make_cloud_notebook.py --run throughput_M,main_M`.** The
+   throughput step prints the hours per size-M run at TOKENS["M"] = 200M (an estimate; see `notes.md`
+   2026-09-27). If it prints more than about 2.6 h per run, stop the session, lower TOKENS["M"] in `grid.py`,
+   rebuild, rerun. Then eight runs: dense, shrunk_r4, tied_gate_relu, thin_tied_relu_r4 at seeds 0-1, key arms
+   first. Take in as usual; the S-size reading either holds at M or it does not.
 3. **Sun Sep 27, 6 pm: go / pivot / no-go.** The screen closed the "which structure on the gate" route. The
    data argue for the **contrast paper** (post-hoc tolerance does not predict trainability; Exp. A, B, C kept;
    retitle). If chosen, add `thin_up_r2/r8` and `thin_down_r2/r8` to `grid.py` (rerun `tests.py`) so Exp. B's
