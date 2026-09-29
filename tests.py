@@ -12,7 +12,7 @@ import os
 import subprocess
 import sys
 
-from grid import arms_for, mlp_params, screen2_arms, screen3_arms, screen_arms
+from grid import arms_for, mlp_params, screen2_arms, screen3_arms, screen4_arms, screen_arms
 from model import GPT, GPTConfig, LowRankLinear, MonarchLinear, SwiGLU, _expand_groups, count_params
 from posthoc_truncate import factorize
 from train import SIZES, thin_gates
@@ -65,7 +65,8 @@ def test_param_counts_match_formula():
     for size, (L, H, d, F) in SIZES.items():
         if size == "L":
             continue                                    # skip the big one to keep the test fast
-        for name, arm in {**arms_for(size, (4,)), **screen_arms(size), **screen2_arms(size), **screen3_arms(size)}.items():
+        for name, arm in {**arms_for(size, (4,)), **screen_arms(size), **screen2_arms(size), **screen3_arms(size),
+                          **screen4_arms(size)}.items():
             counted = count_params(GPT(config_for(arm, L, H, d, F)))["mlp"]
             assert counted == L * mlp_params(size, arm), f"{size}/{name}: {counted} != formula"
 
@@ -96,6 +97,11 @@ def test_matched_arms_are_matched():
             gap = abs(mlp_params(size, s3[name]) - thin) / thin
             assert gap < 0.015, f"{size}/{name} differs from thin gate by {100 * gap:.2f}%"
         assert mlp_params(size, s3["tied_gate_relu_w600"]) == mlp_params(size, s2["shrunk_w400"]), "starved pair not matched"
+        for name, arm in screen4_arms(size).items():
+            if name.startswith(("dense_spec", "warm")):
+                continue
+            gap = abs(mlp_params(size, arm) - thin) / thin
+            assert gap < 0.015, f"{size}/{name} differs from thin gate by {100 * gap:.2f}%"
         assert mlp_params(size, s3["dense_relu"]) == mlp_params(size, {}), "dense_relu must have the dense count"
 
 
@@ -208,6 +214,41 @@ def test_pair_tied_gate_forward():
     assert torch.allclose(m(x), h @ m.down.weight.T, atol=1e-6), "pair-tied forward differs from the hand computation"
     # every unit's gate is a different direction from its content (unlike the self-tie)
     assert not torch.allclose(m.up.weight[0], m.up.weight[1])
+
+
+def test_tied_down_and_extra_activations():
+    """One-matrix block: out = (act(z) z * s) @ U with U the up weight; step tie = plain relu FFN; abs tie = z|z|."""
+    torch.manual_seed(0)
+    L, H, d, F_ = 2, 2, 16, 24
+    base = dict(n_layer=L, n_head=H, d_model=d, d_ff=F_, gate_tie="up")
+    x = torch.randn(3, 5, d)
+    m = SwiGLU(GPTConfig(**base, gate_act="relu", down_tie=1, down_scale=1))
+    assert m.down is None and {n for n, _ in m.named_parameters()} == {"up.weight", "down_scale"}
+    z = x @ m.up.weight.T
+    want = (torch.relu(z) * z * m.down_scale) @ m.up.weight * m.down_gain
+    assert torch.allclose(m(x), want, atol=1e-6), "tied down-projection forward differs from the hand computation"
+    assert abs(m.down_gain - 0.375 / (2 * L) ** 0.5) < 1e-9, "tied down keeps the residual-write scaling"
+    m2 = SwiGLU(GPTConfig(**base, gate_act="relu", down_tie=1))
+    assert sum(p.numel() for p in m2.parameters()) == d * F_, "one matrix per block"
+    step = SwiGLU(GPTConfig(**base, gate_act="step")); z = x @ step.up.weight.T
+    assert torch.allclose(step(x), torch.relu(z) @ step.down.weight.T, atol=1e-6), "step tie must be a plain relu FFN"
+    ab = SwiGLU(GPTConfig(**base, gate_act="abs")); z = x @ ab.up.weight.T
+    assert torch.allclose(ab(x), (z * z.abs()) @ ab.down.weight.T, atol=1e-6), "abs tie must be z|z|"
+    bl = SwiGLU(GPTConfig(n_layer=L, n_head=H, d_model=d, d_ff=F_, gate_act="identity"))
+    assert torch.allclose(bl(x), ((x @ bl.gate.weight.T) * (x @ bl.up.weight.T)) @ bl.down.weight.T, atol=1e-6), "bilinear"
+
+
+def test_weight_spectra_and_activity():
+    from train import weight_spectra
+    torch.manual_seed(0)
+    model = GPT(GPTConfig(n_layer=2, n_head=2, d_model=16, d_ff=24, seq_len=32, gate_tie="up", gate_act="relu"))
+    spec = weight_spectra(model)
+    assert set(spec["stable_rank"]) == {"up", "down"} and len(spec["stable_rank"]["up"]) == 2, "tied gate has no gate matrix"
+    assert all(1 <= r <= 16 for r in spec["r90"]["up"]) and all(1 <= s <= 16 for s in spec["stable_rank"]["up"])
+    for b in model.blocks:
+        b.mlp.record_stats = True
+    model(torch.randint(0, 512, (2, 8)))
+    assert all(0 < b.mlp.last_active < 1 for b in model.blocks), "relu self-gate must leave some units off and some on"
 
 
 def test_zero_init_and_affine_start_as_the_self_gate():

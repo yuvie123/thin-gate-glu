@@ -1186,3 +1186,44 @@ self-gate; (4) Exp. C (heal) if quota allows. The paper's remaining gap is readi
 
 `plot.py` now emits size-suffixed macros (`\meanTiedGateReluM` etc.); `training.pdf`/`training.tex` have a size-M
 panel and block. The paper gets a size-M paragraph below the same date.
+
+### 2026-09-29, later: session 9 built, the mechanism session (decision, assistant, on the author's request to aim
+### for a breakthrough one step at a time)
+
+Another gate variant will not produce one; three screens said so. What can is a mechanism that explains all 82
+runs and makes a prediction that the same session then tests. Hypotheses and predictions, written before the run:
+
+**H1, rank is shed, not imposed.** A trained gate tolerates truncation (Exp. A) but a low-rank gate cannot be
+trained (Exp. B), and truncating a dense gate at 25% of training was worse than training thin from the start.
+Hypothesis: the gate's effective rank falls during training while up and down keep theirs; rank is a
+training-time need. Every run now logs, at every eval, the stable rank and 90%-energy rank of each projection
+and the fraction of active hidden units (`train.py --log_spectra`, on by default; `log["spectra"]`).
+*Predictions:* (a) in the dense rerun the gate's stable rank falls further and earlier than up's and down's;
+(b) warm starts at 50% and 75% of training (dense gate, then rank d/4) do better than the 25% one (4.1233)
+and the 75% one lands within noise of the from-scratch thin gate or better, because by then the rank has
+been shed. If (b) fails, H1 is wrong and the notes will say so.
+
+**H2, GLUs work because they are quadratic, not because they gate.** At equal parameters a one-direction
+quadratic unit relu(z) z beat every two-direction gated unit tried, and ReGLU lost to SwiGLU while the relu
+self-gate beat both. The 2x2 that decides it, all at shrunk_r4's budget: relu self-gate (one direction,
+selective, quadratic: 4.081, done); `relu_ffn` (one direction, selective, linear: h = relu(z), 1200 wide);
+`tied_gate_abs` (one direction, not selective, quadratic: h = z|z|, 1200 wide); `bilinear_r4` (two directions,
+not selective: (Gx)(Ux), 800 wide; Shazeer 2020 found bilinear GLUs competitive). *Predictions:* relu_ffn is
+clearly worse than the relu self-gate (the square matters); bilinear is within noise of SwiGLU shrunk (the
+activation on the gate matters little when there are two directions); z|z| is between (quadratic without
+selection). If relu_ffn matches the self-gate, H2 is wrong.
+
+**H3, the long shot: one matrix per block.** If width is what matters once units self-gate, tie the
+down-projection to the up-projection too: out = gain * sum_i s_i u_i relu(u_i x)^2, which is the Dense
+Associative Memory of Krotov and Hopfield (2016) used as an FFN (the Energy Transformer, Hoover et al. 2023,
+does this outside language modelling). At the budget that is 2400 units from one 384x2400 matrix
+(`tied_down_relu_scaled`, per-unit write scale s so a unit can write -u_i; `tied_down_relu` without it as the
+ablation). The tied block writes coherently along its input, so its init output was 2.7x the untied block's;
+the gain carries a measured 0.375 factor so both start at the same scale (checked on the CPU: 0.0378 vs
+0.0378). *Prior:* 35% that it beats the relu self-gate at 1200; 65% that it beats shrunk. Three seeds.
+
+Also: `dense_spec` and `tied_gate_relu_spec` are reruns of finished arms with the spectra on; the second is a
+free seed-0 replicate of the relu self-gate (run-to-run nondeterminism on the same GPU). Both are excluded from
+the paper tables (`plot.py` drops `_spec_`). 11 runs, about 8 h; order: the two spectra reruns, the H3 arm,
+the 2x2 cells, the two warm starts, the H3 ablation, then H3 seeds 1-2. Tests 19/19 (tied-down forward with
+the gain, step = relu FFN, abs = z|z|, bilinear, spectra and activity probes); baseline smoke curve unchanged.

@@ -61,6 +61,12 @@ STEPS = {   # name -> (heading, command, note)
                 "low-rank gate without the tie), then one-seed diagnostics (grid.py screen3_arms). All at shrunk_r4's "
                 "parameters unless noted. References: S_shrunk_r4 s0/s1/s2 = 4.1043 / 4.1043 / 4.1124, "
                 "S_tied_gate_relu s0/s1/s2 = 4.0814 / 4.0757 / 4.0860, S_shrunk_w400 s0/s1/s2 = 4.1602 / 4.1535 / 4.1608."),
+    "screen4": ("Experiment B: mechanism session (size S)",
+                "python cloud_run.py grid --stage screen4 --max_hours 11",
+                "Every run now logs the stable rank of each projection at every eval. Spectra reruns of dense and the "
+                "relu self-gate; the quadratic-vs-gating 2x2 (relu FFN, z|z|, bilinear); warm starts at 50% and 75%; "
+                "the down-projection tied to the up-projection (one matrix, 2400 units) at three seeds "
+                "(grid.py screen4_arms). Reference: S_shrunk_r4 s0/s1/s2 = 4.1043 / 4.1043 / 4.1124."),
     "lr": ("Experiment B: learning-rate check", "python cloud_run.py grid --stage lr --max_hours 11", ""),
     "heal": ("Experiment C: truncate, then train only the new factors", "python cloud_run.py heal", ""),
     "bench": ("Measured speed and memory of every arm", "python cloud_run.py bench", ""),

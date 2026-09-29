@@ -166,10 +166,13 @@ run log and the place where every decision is recorded.
 
 ### Next, in order
 1. ~~Sessions 2-8~~ done. Size S complete (main grid, three screens); size M key arms at two seeds. **GO.**
-2. **Reading, now the critical path:** Primer (So et al. 2021) first, then Shazeer 2020, the xIELU paper, MGLU,
-   WeLore; export BibTeX from each paper's page only after reading. Related Work and Introduction cannot be
-   written before this.
-3. Optional GPU sessions, in value order: `--run bench` (S and M; needs the tied arms added to `bench.py`),
+2. **Session 9 (built 2026-09-29, upload next): `make_cloud_notebook.py --run screen4`, the mechanism session.**
+   Three pre-registered hypotheses with predictions in `notes.md` 2026-09-29 later: rank is shed during training
+   (spectra logged in every run; late warm starts as the test), GLUs are quadratic rather than gating (a 2x2 of
+   cheap cells), and one matrix per block (down tied to up, 2400 units, three seeds). 11 runs, about 8 h.
+3. **Reading remains the critical path:** Primer first, then Shazeer 2020, xIELU, MGLU, WeLore, and now Krotov
+   and Hopfield 2016 (Dense Associative Memory) and the Energy Transformer if the tied-down block does anything.
+4. Optional GPU sessions, in value order: `--run bench` (S and M; needs the tied arms added to `bench.py`),
    seeds 1-2 of the starved pair with `tied_gate_relu_w600`, `--run heal` for Exp. C. None blocks the paper.
 4. Meanwhile the author reads WeLore (Sec. 2.1, 2.4, 3.1, Figs 1, 3, 7) first, then the other must-reads in
    `related.md`; BibTeX exported from each paper's page only after reading it.

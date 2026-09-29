@@ -45,10 +45,13 @@ class GPTConfig:
     gate_tie: str = "none"           # "up": the gate reuses the up-projection's weights (zero gate parameters);
                                      # with gate_rank > 0 a rank-r term and a per-unit scale are added to it.
                                      # "pair": hidden units come in pairs and each is gated by its partner
-    gate_act: str = "silu"           # activation applied to the gate pre-activation: "silu" or "relu"
+    gate_act: str = "silu"           # on the gate pre-activation: "silu", "relu", "abs" (z|z| when tied: quadratic but
+                                     # not selective), "step" (1[z>0]: a plain relu FFN when tied), "identity" (bilinear)
     gate_shared: int = 0             # 1: one dense gate matrix is shared by every layer
     gate_bias: int = 0               # tied gates: 1 adds a per-unit threshold b to the gate pre-activation (init 0)
     gate_bypass: int = 0             # tied gates: 1 adds a per-unit beta to act(g), so h = z (act(g) + beta) (init 0)
+    down_tie: int = 0                # 1: the down-projection is the transpose of the up-projection (one matrix per block)
+    down_scale: int = 0              # with down_tie: 1 adds a per-unit scale s (init 1) so a unit can write -u_i as well
     rope_base: float = 10000.0
     init_std: float = 0.02
 
@@ -162,6 +165,10 @@ def make_linear(in_features, out_features, rank, init_std, init="balanced", bott
     return layer
 
 
+ACTS = {"silu": F.silu, "relu": F.relu, "abs": torch.abs, "step": lambda t: (t > 0).to(t.dtype),
+        "identity": lambda t: t}
+
+
 def _expand_groups(t, g):
     """[..., n] -> [..., n * g], each value repeated g times in a row (a view plus one copy)."""
     if g == 1:
@@ -176,7 +183,9 @@ class SwiGLU(nn.Module):
         assert F_ % cfg.gate_groups == 0 and F_ % cfg.up_groups == 0 and F_ % cfg.down_groups == 0
         assert sum([cfg.gate_rank > 0, cfg.gate_groups > 1, cfg.gate_monarch > 0]) <= 1, "one gate structure at a time"
         assert not (cfg.up_rank > 0 and cfg.up_groups > 1) and not (cfg.down_rank > 0 and cfg.down_groups > 1)
-        assert cfg.gate_tie in ("none", "up", "pair") and cfg.gate_act in ("silu", "relu")
+        assert cfg.gate_tie in ("none", "up", "pair") and cfg.gate_act in ("silu", "relu", "abs", "step", "identity")
+        assert not (cfg.down_tie and (cfg.down_rank or cfg.down_groups > 1 or cfg.up_rank or cfg.up_groups > 1)), \
+            "a tied down-projection needs plain up and down"
         assert not (cfg.gate_tie == "pair" and (cfg.gate_rank or F_ % 2)), "pair tie: no rank term, even d_ff"
         if cfg.gate_tie != "none" or cfg.gate_shared:
             assert cfg.gate_groups == 1 and cfg.gate_monarch == 0 and cfg.up_rank == 0 and cfg.up_groups == 1, \
@@ -204,29 +213,47 @@ class SwiGLU(nn.Module):
         else:
             self.gate = make_linear(d, F_ // cfg.gate_groups, cfg.gate_rank, std, cfg.lowrank_init, cfg.bottleneck)
         self.up = make_linear(d, F_ // cfg.up_groups, cfg.up_rank, std, cfg.lowrank_init, cfg.bottleneck)
-        self.down = make_linear(F_ // cfg.down_groups, d, cfg.down_rank, down_std, cfg.lowrank_init, cfg.bottleneck)
+        self.down_tied = bool(cfg.down_tie)
+        if self.down_tied:
+            self.down = None                            # out = gain * (h * s) @ U, with U the up-projection's weight
+            # 1/sqrt(2L) is the residual-write scaling a fresh down matrix gets; the extra 0.375 matches the measured
+            # init output scale of the untied relu self-gate at size S (a tied block writes coherently along its
+            # input, so its sum grows like F, not sqrt(F)). The learnable per-unit scale can undo it.
+            self.down_gain = down_std / std * 0.375
+            self.down_scale = nn.Parameter(torch.ones(F_)) if cfg.down_scale else None
+        else:
+            self.down = make_linear(F_ // cfg.down_groups, d, cfg.down_rank, down_std, cfg.lowrank_init, cfg.bottleneck)
+
+    def write_back(self, h):
+        if getattr(self, "record_stats", False):      # set by train.py on the uncompiled model for one batch
+            self.last_active = (h != 0).float().mean().item()
+        if not self.down_tied:
+            return self.down(h)
+        if self.down_scale is not None:
+            h = h * self.down_scale
+        return F.linear(h, self.up.weight.t()) * self.down_gain        # h @ U, scaled like a fresh down matrix
 
     def forward(self, x):
         if self.paired:
             z = self.up(x).float()
             a, b = z[..., 0::2], z[..., 1::2]
-            act = F.silu if self.act == "silu" else F.relu
+            act = ACTS[self.act]
             h = torch.stack((act(b) * a, act(a) * b), dim=-1).flatten(-2)
-            return self.down(h.to(x.dtype))
+            return self.write_back(h.to(x.dtype))
         if self.tied:
             z = self.up(x).float()                      # float32: z * act(z) is quadratic and float16 tops out at |z| = 256
             g = z if self.gate is None else self.gate(x).float() + self.tie_scale * z
             if self.gate_bias is not None:
                 g = g + self.gate_bias
-            act = F.silu if self.act == "silu" else F.relu
+            act = ACTS[self.act]
             a = act(g) if self.gate_bypass is None else act(g) + self.gate_bypass
-            return self.down((a * z).to(x.dtype))
+            return self.write_back((a * z).to(x.dtype))
         g = _expand_groups(self.gate(x), self.gate_groups)
         u = _expand_groups(self.up(x), self.up_groups)
-        h = F.silu(g) * u if self.act == "silu" else F.relu(g) * u
+        h = ACTS[self.act](g) * u
         if self.down_groups > 1:      # average g neighbouring hidden units so the residual write keeps its scale
             h = h.reshape(*h.shape[:-1], h.shape[-1] // self.down_groups, self.down_groups).mean(-1)
-        return self.down(h)
+        return self.write_back(h)
 
 
 def apply_rope(x, cos, sin):

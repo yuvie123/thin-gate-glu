@@ -52,7 +52,12 @@ def get_args():
     ap.add_argument("--gate_tie", default="none", choices=["none", "up", "pair"],
                     help="up: the gate reuses the up-projection (h = act(z) * z); with --gate_rank a rank-r term "
                          "and a per-unit scale are added to it. pair: units come in pairs, each gated by its partner")
-    ap.add_argument("--gate_act", default="silu", choices=["silu", "relu"], help="activation on the gate")
+    ap.add_argument("--gate_act", default="silu", choices=["silu", "relu", "abs", "step", "identity"], help="activation on the gate")
+    ap.add_argument("--down_tie", type=int, default=0, help="1: the down-projection is the up-projection transposed")
+    ap.add_argument("--down_scale", type=int, default=0, help="with --down_tie: 1 adds a per-unit write scale (init 1)")
+    ap.add_argument("--log_spectra", type=int, default=1,
+                    help="1: at every eval, log the stable rank and 90%%-energy rank of every dense projection and the "
+                         "fraction of active hidden units (a mechanism probe; costs a few ms)")
     ap.add_argument("--gate_shared", type=int, default=0, help="1: one dense gate matrix shared by every layer")
     ap.add_argument("--gate_bias", type=int, default=0, help="tied gates: 1 adds a per-unit threshold (init 0)")
     ap.add_argument("--gate_bypass", type=int, default=0, help="tied gates: 1 adds a per-unit linear bypass (init 0)")
@@ -142,6 +147,49 @@ def thin_gates(model, opt, rank, grams, factor_wd):
 
 @torch.no_grad()
 @torch.no_grad()
+def weight_spectra(model):
+    """Stable rank ||W||_F^2 / ||W||_2^2 and the number of singular values holding 90% of the squared energy,
+    per layer, for gate, up and down (dense weights, or the product of low-rank factors)."""
+    out = {"stable_rank": {}, "r90": {}}
+    for proj in ("gate", "up", "down"):
+        sr, r90 = [], []
+        for b in model.blocks:
+            m = getattr(b.mlp, proj, None)
+            if m is None or (proj == "gate" and b.mlp.tied and b.mlp.gate is None):
+                W = None
+            elif isinstance(m, LowRankLinear):
+                W = m.B.weight.float() @ m.A.weight.float()
+            elif isinstance(m, torch.nn.Linear):
+                W = m.weight.float()
+            else:
+                W = None
+            if W is None:
+                continue
+            s2 = torch.linalg.svdvals(W) ** 2
+            sr.append((s2.sum() / s2[0]).item())
+            r90.append(int((torch.cumsum(s2, 0) < 0.9 * s2.sum()).sum().item()) + 1)
+        if sr:
+            out["stable_rank"][proj], out["r90"][proj] = sr, r90
+    return out
+
+
+@torch.no_grad()
+def active_fraction(model, data, args, device, autocast):
+    """Fraction of nonzero hidden activations per layer on one validation batch (uncompiled model)."""
+    for b in model.blocks:
+        b.mlp.record_stats = True
+    model.eval()
+    x, y = next(iter(data.val_batches(args.micro_bs, 1)))
+    with autocast:
+        model(x.to(device), y.to(device))
+    model.train()
+    fr = [b.mlp.last_active for b in model.blocks]
+    for b in model.blocks:
+        b.mlp.record_stats = False
+    return fr
+
+
+@torch.no_grad()
 def max_up_preactivation(model, data, args, device, autocast):
     """Largest |up(x)| over one validation batch, from the uncompiled model. A tied gate multiplies z by
     act(z), so this says how far the run is from float16's limit (|z| = 256 -> z^2 = 65536)."""
@@ -195,7 +243,7 @@ def main():
         gate_groups=args.gate_groups, up_groups=args.up_groups, down_groups=args.down_groups,
         gate_monarch=args.gate_monarch, lowrank_init=args.lowrank_init, bottleneck=args.bottleneck,
         gate_tie=args.gate_tie, gate_act=args.gate_act, gate_shared=args.gate_shared,
-        gate_bias=args.gate_bias, gate_bypass=args.gate_bypass,
+        gate_bias=args.gate_bias, gate_bypass=args.gate_bypass, down_tie=args.down_tie, down_scale=args.down_scale,
     )
     if args.thin_at > 0:
         assert 0 < args.thin_at < 1 and args.gate_rank > 0, "--thin_at needs 0 < f < 1 and a --gate_rank target"
@@ -310,6 +358,13 @@ def main():
             val = evaluate(step_model, data, args, device, autocast)
             log["val"].append({"step": step + 1, "loss": val})
             print(f"[{args.name}] step {step + 1}  VAL loss {val:.4f}")
+            if args.log_spectra:
+                spec = weight_spectra(model)
+                spec["step"], spec["active"] = step + 1, active_fraction(model, data, args, device, autocast)
+                log.setdefault("spectra", []).append(spec)
+                g = spec["stable_rank"].get("gate"); u = spec["stable_rank"].get("up")
+                print(f"[{args.name}]   stable rank gate {g and round(sum(g) / len(g), 1)} up {u and round(sum(u) / len(u), 1)}"
+                      f"  active {sum(spec['active']) / len(spec['active']):.2f}")
             if ref_curve and step + 1 in kill_steps:
                 ref_val = ref_curve.get(step + 1)
                 if ref_val is None:

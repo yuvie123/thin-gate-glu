@@ -220,6 +220,9 @@ def cmd_check(args):
                        ("smoke pair tied", smoke + ["--name", "smoke_pair", "--gate_tie", "pair", "--gate_act", "relu"]),
                        ("smoke affine zero", smoke + ["--name", "smoke_affine", "--gate_tie", "up", "--gate_act", "relu",
                                                       "--gate_rank", "16", "--lowrank_init", "zero", "--gate_bias", "1", "--gate_bypass", "1"]),
+                       ("smoke tied down", smoke + ["--name", "smoke_tied_down", "--gate_tie", "up", "--gate_act", "relu",
+                                                    "--down_tie", "1", "--down_scale", "1"]),
+                       ("smoke bilinear", smoke + ["--name", "smoke_bilinear", "--gate_act", "identity", "--gate_rank", "0"]),
                        ("smoke kill rule", smoke + ["--name", "smoke_killed", "--ref_json", "results/smoke/smoke.json",
                                                     "--kill_steps", "10:-10", "--expect_killed"])]:
         r = subprocess.run(cmd, capture_output=True, text=True)

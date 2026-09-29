@@ -16,6 +16,8 @@ Stages follow the day-by-day plan:
             starved-budget pair; every run carries a reference curve for the early-kill rule (see screen2_arms)
     screen3 size S: context-thresholded self-gating at three context ranks (matched parameters), the control that
             says what the screen-2 win means (relu in a dense gate), then one-seed diagnostics
+    screen4 size S: mechanism session: spectra reruns, the quadratic-vs-gating 2x2, late warm starts, the
+            down-projection tied to the up-projection (see screen4_arms)
 
 Arms (r = rank, d = d_model, F = default d_ff):
     dense            standard SwiGLU
@@ -164,6 +166,32 @@ def screen3_arms(size, K=4):
     }
 
 
+def screen4_arms(size, K=4):
+    """Mechanism session. (a) Spectra reruns of dense and the relu self-gate (every run now logs the stable rank
+    of each projection at every eval). (b) The 2x2 that separates 'quadratic' from 'gating': relu self-gate
+    (one direction, selective, quadratic) vs relu FFN (one direction, selective, linear) vs z|z| (one direction,
+    not selective, quadratic) vs bilinear (two directions, not selective). (c) Late warm starts (dense gate for
+    50% / 75% of training, then rank d/4), the prediction of the rank-shedding hypothesis. (d) The down-projection
+    tied to the up-projection: one matrix per block, 2400 units at the budget (Dense Associative Memory)."""
+    _, _, d, F = SIZES[size]
+    r = d // K
+    thin_params = 2 * d * F + r * (d + F)
+    Ft = round_to(thin_params / (2 * d), 8)           # 1200 at S
+    Fs = round_to(thin_params / (3 * d), 8)           # 800
+    F1 = round_to(thin_params / d, 8)                 # 2400: one matrix
+    return {
+        "dense_spec": {},
+        "tied_gate_relu_spec": {"d_ff": Ft, "gate_tie": "up", "gate_act": "relu"},
+        "tied_down_relu_scaled": {"d_ff": F1, "gate_tie": "up", "gate_act": "relu", "down_tie": 1, "down_scale": 1},
+        "relu_ffn": {"d_ff": Ft, "gate_tie": "up", "gate_act": "step"},
+        "tied_gate_abs": {"d_ff": Ft, "gate_tie": "up", "gate_act": "abs"},
+        f"bilinear_r{K}": {"d_ff": Fs, "gate_act": "identity"},
+        f"warm_gate_r{K}_f50": {"gate_rank": r, "thin_at": 0.5},
+        f"warm_gate_r{K}_f75": {"gate_rank": r, "thin_at": 0.75},
+        "tied_down_relu": {"d_ff": F1, "gate_tie": "up", "gate_act": "relu", "down_tie": 1},
+    }
+
+
 def mlp_params(size, arm):
     """MLP parameters per layer for an arm dict (the keys are train.py flags)."""
     L, _, d, F = SIZES[size]
@@ -171,7 +199,9 @@ def mlp_params(size, arm):
     total = 0
     for proj, (n_in, n_out) in (("gate", (d, F)), ("up", (d, F)), ("down", (F, d))):
         r, g, nb = arm.get(f"{proj}_rank", 0), arm.get(f"{proj}_groups", 1), arm.get(f"{proj}_monarch", 0)
-        if proj == "gate" and arm.get("gate_tie") in ("up", "pair"):
+        if proj == "down" and arm.get("down_tie"):
+            total += n_in if arm.get("down_scale") else 0             # the matrix is the up-projection's
+        elif proj == "gate" and arm.get("gate_tie") in ("up", "pair"):
             total += r * (n_in + n_out) + n_out if r else 0      # optional rank-r term plus a per-unit scale
             total += n_out * (bool(arm.get("gate_bias")) + bool(arm.get("gate_bypass")))
         elif proj == "gate" and arm.get("gate_shared"):
@@ -219,6 +249,14 @@ def runs_for(stage):
     elif stage == "screen":
         arms = screen_arms("S")
         add("S", list(arms), [0], arms=arms)      # priority order: the launch deadline drops the tail
+    elif stage == "screen4":
+        arms = screen4_arms("S")
+        ref = {"tied_down_relu_scaled", "relu_ffn", "tied_gate_abs", "bilinear_r4", "tied_down_relu"}
+        order = list(arms) + ["tied_down_relu_scaled", "tied_down_relu_scaled"]      # seeds 1, 2 of the long shot last
+        seeds = [0] * len(arms) + [1, 2]
+        for a, seed in zip(order, seeds):
+            extra = {"ref_json": f"results/train/S_shrunk_r4_s{seed}.json"} if a in ref else {}
+            out.append((f"S_{a}_s{seed}", "S", arms[a], seed, extra))
     elif stage == "screen3":
         arms = screen3_arms("S")
         refs = {"shrunk_relu_r4": "S_shrunk_r4", "tied_gate_relu_w600": "S_shrunk_w400", "thin_tied_relu_r8": "S_shrunk_r4",
@@ -268,7 +306,8 @@ if __name__ == "__main__":
         for size in SIZES:
             base = mlp_params(size, {})
             print(f"\nsize {size}: MLP parameters per layer (dense = {base:,})")
-            for name, arm in {**arms_for(size, (2, 4, 8)), **screen_arms(size), **screen2_arms(size), **screen3_arms(size)}.items():
+            for name, arm in {**arms_for(size, (2, 4, 8)), **screen_arms(size), **screen2_arms(size), **screen3_arms(size),
+                          **screen4_arms(size)}.items():
                 p = mlp_params(size, arm)
                 print(f"  {name:26s} {p:>10,}  ({100 * p / base:5.1f}% of dense)  {arm}")
         sys.exit()

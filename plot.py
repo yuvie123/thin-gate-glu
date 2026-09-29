@@ -112,7 +112,7 @@ def arm_of(name):            # "S_thin_gate_r4_s0" -> ("S", "thin_gate_r4")
 
 def arm_color(arm):
     if arm.startswith(("thin_gate", "reinvest", "monarch_gate", "grouped_gate", "bottleneck", "warm_gate",
-                       "tied_gate", "thin_tied", "shared_gate", "pair_tied")):
+                       "tied_gate", "thin_tied", "shared_gate", "pair_tied", "tied_down", "relu_ffn", "bilinear")):
         return STYLE["gate_proj"][0]
     if arm.startswith(("thin_up", "grouped_up")):
         return STYLE["up_proj"][0]
@@ -279,7 +279,7 @@ def plot_context_rank(by, out_dir):
 
 
 def plot_training(runs, out_dir):
-    runs = [r for r in runs if "_lr" not in r["name"]]
+    runs = [r for r in runs if "_lr" not in r["name"] and "_spec_" not in r["name"]]   # lr sweep and spectra reruns
     warm = [r for r in runs if "thin_swap" in r.get("log", {})]     # not parameter-matched from step 0
     table_warm_start(warm, out_dir)
     runs = [r for r in runs if r not in warm]
