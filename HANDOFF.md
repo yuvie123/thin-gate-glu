@@ -157,18 +157,20 @@ run log and the place where every decision is recorded.
   the starved budget by 0.022. **The paper is now a controlled answer to "what does a GLU gate need?" with
   Primer's squared ReLU as the anchor, not a new block.** Reading in `notes.md` 2026-09-25.
 
+- **2026-09-29: Kaggle session 8 taken in (size M, 8 runs, all ok).** Throughput at M 39.5k tok/s (1.4 h per
+  200M-token run). Every size-S ordering repeats at M with two seeds: relu self-gate beats shrunk (-0.018) and
+  dense (-0.009) at both seeds with 78% of the MLP parameters; the rank-d/4 context block beats shrunk, ties
+  dense, trails the self-gate by 0.012. Dense seed range at M is 0.002. **Go/no-go: GO**, two sizes. Table
+  in `notes.md` 2026-09-29. The remaining work is reading and writing; GPU work is optional (bench, starved
+  seeds, Exp. C).
+
 ### Next, in order
-1. ~~Sessions 2-7~~ done. `main_S` complete; screens 1-3 done; every question at size S answered.
-2. **Session 8 (built 2026-09-27, upload next): `make_cloud_notebook.py --run throughput_M,main_M`.** The
-   throughput step prints the hours per size-M run at TOKENS["M"] = 200M (an estimate; see `notes.md`
-   2026-09-27). If it prints more than about 2.6 h per run, stop the session, lower TOKENS["M"] in `grid.py`,
-   rebuild, rerun. Then eight runs: dense, shrunk_r4, tied_gate_relu, thin_tied_relu_r4 at seeds 0-1, key arms
-   first. Take in as usual; the S-size reading either holds at M or it does not.
-3. **Sun Sep 27, 6 pm: go / pivot / no-go.** The screen closed the "which structure on the gate" route. The
-   data argue for the **contrast paper** (post-hoc tolerance does not predict trainability; Exp. A, B, C kept;
-   retitle). If chosen, add `thin_up_r2/r8` and `thin_down_r2/r8` to `grid.py` (rerun `tests.py`) so Exp. B's
-   headline figure is a rank sweep of all three projections at three seeds (12 runs, one session). Record the
-   decision in `notes.md`.
+1. ~~Sessions 2-8~~ done. Size S complete (main grid, three screens); size M key arms at two seeds. **GO.**
+2. **Reading, now the critical path:** Primer (So et al. 2021) first, then Shazeer 2020, the xIELU paper, MGLU,
+   WeLore; export BibTeX from each paper's page only after reading. Related Work and Introduction cannot be
+   written before this.
+3. Optional GPU sessions, in value order: `--run bench` (S and M; needs the tied arms added to `bench.py`),
+   seeds 1-2 of the starved pair with `tied_gate_relu_w600`, `--run heal` for Exp. C. None blocks the paper.
 4. Meanwhile the author reads WeLore (Sec. 2.1, 2.4, 3.1, Figs 1, 3, 7) first, then the other must-reads in
    `related.md`; BibTeX exported from each paper's page only after reading it.
 5. **Sep 28 - Oct 11:** the rank-sweep session if the contrast paper is chosen (`make_cloud_notebook.py --run main_S` after the `grid.py` change; the runner skips the 33 finished runs). Related Work and Method drafts.

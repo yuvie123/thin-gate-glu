@@ -146,7 +146,10 @@ a seed see identical batches and every comparison below is paired by seed; we us
 We report the cross-entropy on a fixed held-out set of \evalTokensK{}K FineWeb tokens after the last step.
 All hyperparameters were fixed before the first arm ran and are identical across arms; the method received
 no tuning the baseline did not. Runs use \ampDtype{} autocast with loss scaling on \gpuName{} GPUs (no
-native bfloat16). \todo{Size M, once it has run. Exp.~C setup, once it has run.}
+native bfloat16). Size M has \nLayerM{} layers, $d = \dModelM$, $d_{\mathrm{ff}} = \dFFM$ (\denseTotalMM{}M parameters,
+\denseNonEmbedMM{}M outside the embedding) and is trained on \trainTokensMM{}M tokens with the same recipe and
+two seeds; its token budget was fixed from a throughput measurement before any size-M arm ran.
+\todo{Exp.~C setup, once it has run.}
 
 \subsection{Which projection tolerates rank reduction in pretrained models?}
 \label{sec:expa}
@@ -265,7 +268,16 @@ missing. But the curve is monotone: every parameter moved from width into contex
 block is the best of the family. Zero-initialising the context, and adding a per-unit threshold and a linear
 bypass, change nothing beyond noise. At a starved budget ($d_{\mathrm{ff}} = 400$ for shrunk) the relu
 self-gate at $d_{\mathrm{ff}} = 600$ is ahead by 0.02 at one seed (Table~\ref{tab:starved}), five times its
-margin at the main budget. \todo{seeds 1-2 of the starved pair; size M.}
+margin at the main budget. \todo{seeds 1-2 of the starved pair.}
+
+\paragraph{The ordering holds at a larger size.} At size M (\nLayerM{} layers, $d = \dModelM$,
+$d_{\mathrm{ff}} = \dFFM$, \denseTotalMM{}M parameters, \trainTokensMM{}M tokens, two seeds) every
+comparison above repeats (Table~\ref{tab:training}). The relu self-gate ends at \meanTiedGateReluM{} against
+\meanShrunkRFourM{} for shrunk and \meanDenseM{} for dense, ahead of both at both seeds with 78\% of the
+dense MLP parameters; the rank-$d/4$ context block ends at \meanThinTiedReluRFourM{}, ahead of shrunk at both
+seeds, level with dense, and behind the rank-0 self-gate at both seeds. The dense seeds are 0.002 apart at this
+size, so these gaps are many times the noise. \todo{Size M seeds beyond two, if quota allows; the S and M
+throughput figures belong in the appendix with bench.py's numbers.}
 
 \begin{figure}[t]
   \centering

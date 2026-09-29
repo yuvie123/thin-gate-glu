@@ -1151,3 +1151,38 @@ hours per run; if it says more than about 2.6 h, the author stops the session, l
 reruns; the grid step uses `--job_hours 2.8` so no run can start too late to finish inside the commit. No
 reference curves exist at M, so the kill rule is off. `cloud_run.py throughput` for S is unchanged (same file
 name). Tests 17/17.
+
+## 2026-09-29
+
+### 2026-09-29: Kaggle session 8 taken in: size M confirms the size-S story
+
+Zip renamed `thin_gate_results_session8_mainM.zip` (browser name `thin_gate_results (7).zip`). Session ran 03:11
+to 09:07 UTC Sep 28, 5.9 h; checks ok (17/17, all smokes). **Throughput at M measured first: 39,506 tokens/s,
+so one 200M-token run is 1.4 h** (the 200M estimate was pessimistic; it stays, since every M arm must share
+one budget and the grid has now run at it). All 8 runs finished `[ok]`, 77-86 min each; no nan, inf or
+overflow; largest |Ux| 11.4; peak memory 3.4 GB. 108 files; 88 carried byte-identical; 9 new (8 runs plus the
+throughput JSON, which lives in `results/scratch` and is not committed).
+
+Size M: 8 layers, d 512, d_ff 1344, 50.7M parameters (24.9M outside the embedding), 200M tokens, seeds 0-1.
+
+| Arm | d_ff | MLP params (all layers) | s0 | s1 | mean | paired vs shrunk r4 | paired vs dense |
+|---|---|---|---|---|---|---|---|
+| dense | 1344 | 16,515,072 | 4.0735 | 4.0718 | 4.0727 | | |
+| shrunk r4 | 1048 | 12,877,824 | 4.0818 | 4.0810 | 4.0814 | | +0.008 / +0.009 |
+| tied_gate_relu (relu self-gate) | 1576 | 12,910,592 | 4.0663 | 4.0614 | 4.0639 | **-0.016 / -0.020** | **-0.007 / -0.010** |
+| thin_tied_relu_r4 (rank 128 context) | 1344 | 12,921,344 | 4.0793 | 4.0719 | 4.0756 | -0.002 / -0.009 | +0.006 / +0.000 |
+
+**Reading, stated plainly.** Every ordering from size S repeats at M with two seeds: the relu self-gate beats
+shrunk at both seeds (mean -0.018; at S -0.026) and beats dense at both seeds (mean -0.009; at S -0.013) with
+78% of the dense MLP parameters; the rank-d/4 context block beats shrunk at both seeds (mean -0.006; at S -0.014),
+ties dense, and is behind the rank-0 self-gate by 0.011 to 0.013 at both seeds (at S 0.012). Dense seed range
+at M is 0.002, far tighter than at S. The gaps are somewhat smaller at M than at S (dense-shrunk 0.009 vs
+0.013), consistent with the width curve flattening as the block grows; the direction is unchanged everywhere.
+
+**Sep 27 go/no-go, recorded late (the author was away; the data are in hand now): GO** for the paper as framed
+on 2026-09-25, now with two sizes. Remaining GPU work, in value order: (1) nothing essential; (2) `bench.py` at
+S and M for the speed table (the tied block has two matmuls); (3) seeds 1-2 of the starved pair with the relu
+self-gate; (4) Exp. C (heal) if quota allows. The paper's remaining gap is reading and writing, not experiments.
+
+`plot.py` now emits size-suffixed macros (`\meanTiedGateReluM` etc.); `training.pdf`/`training.tex` have a size-M
+panel and block. The paper gets a size-M paragraph below the same date.
