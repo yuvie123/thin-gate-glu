@@ -77,19 +77,32 @@ def factorize(weight, gram=None):
         U, s, Vh = torch.linalg.svd(W, full_matrices=False)
         return U.cpu(), s.cpu(), Vh.cpu()
     # Whitening. A small ridge keeps the Cholesky factorization numerically safe.
+    gram = gram.double()
+    if not torch.isfinite(gram).all():
+        print("WARNING: non-finite calibration gram; falling back to plain SVD for this matrix")
+        U, s, Vh = torch.linalg.svd(W, full_matrices=False)
+        return U.cpu(), s.cpu(), Vh.cpu()
     ridge = 1e-5 * gram.diagonal().mean()
-    eye = torch.eye(gram.size(0), device=gram.device)
+    eye = torch.eye(gram.size(0), device=gram.device, dtype=gram.dtype)
+    S = Sinv = None
     for attempt in range(6):
         try:
             S = torch.linalg.cholesky(gram + ridge * eye)
+            Sinv = None                                                   # triangular solve below
             break
         except torch.linalg.LinAlgError:
             ridge = ridge * 10
-    else:
-        raise RuntimeError("Cholesky failed even with a large ridge")
-    U, s, Vh = torch.linalg.svd(W @ S, full_matrices=False)
-    V = torch.linalg.solve_triangular(S, Vh, upper=False, left=False)   # Vh @ S^-1
-    return U.cpu(), s.cpu(), V.cpu()
+    if S is None:
+        # Late in training the input gram can be so ill-conditioned (a few dominant channels) that Cholesky
+        # fails at any sane ridge in float32; the symmetric square root from an eigendecomposition always exists.
+        evals, evecs = torch.linalg.eigh(gram)
+        evals = evals.clamp(min=1e-5 * evals.max())
+        S = (evecs * evals.sqrt()) @ evecs.T
+        Sinv = (evecs * evals.rsqrt()) @ evecs.T
+        print("WARNING: whitening used the eigendecomposition square root (Cholesky failed)")
+    U, s, Vh = torch.linalg.svd(W.double() @ S, full_matrices=False)
+    V = Vh @ Sinv if Sinv is not None else torch.linalg.solve_triangular(S, Vh, upper=False, left=False)   # Vh @ S^-1
+    return U.float().cpu(), s.float().cpu(), V.float().cpu()
 
 
 @torch.no_grad()

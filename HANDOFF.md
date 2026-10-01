@@ -164,12 +164,18 @@ run log and the place where every decision is recorded.
   in `notes.md` 2026-09-29. The remaining work is reading and writing; GPU work is optional (bench, starved
   seeds, Exp. C).
 
+- **2026-10-01: Kaggle session 9 taken in.** The dense gate's stable rank falls from 96 to 27 in the first third
+  of training while up falls to 65 and down rises to 50: the mechanism of Exp. A (figure `spectra.pdf`). The
+  2x2 says the self-gate wins because it is selective *and* quadratic (relu FFN 4.115; z|z| and bilinear killed
+  at +0.10 / +0.04). One matrix per block is dead (+0.10). The warm starts crashed on an ill-conditioned
+  whitening gram, now fixed (eigendecomposition fallback, test added); they rerun in session 10 with a 90% one.
+  Run-to-run noise on the same GPU is 0.002. The relu self-gate has 18% active units. `notes.md` 2026-10-01.
+
 ### Next, in order
 1. ~~Sessions 2-8~~ done. Size S complete (main grid, three screens); size M key arms at two seeds. **GO.**
-2. **Session 9 (built 2026-09-29, upload next): `make_cloud_notebook.py --run screen4`, the mechanism session.**
-   Three pre-registered hypotheses with predictions in `notes.md` 2026-09-29 later: rank is shed during training
-   (spectra logged in every run; late warm starts as the test), GLUs are quadratic rather than gating (a 2x2 of
-   cheap cells), and one matrix per block (down tied to up, 2400 units, three seeds). 11 runs, about 8 h.
+2. **Session 10 (built 2026-10-01, upload next): `make_cloud_notebook.py --run screen5,bench`.** Warm starts
+   at 50/75/90% (H1 part b), spectra of thin_gate_r4 and shrunk_r4, seeds 1-2 of the starved pair, then
+   `bench.py` at S and M. About 7-8 h. Take in as usual.
 3. **Reading remains the critical path:** Primer first, then Shazeer 2020, xIELU, MGLU, WeLore, and now Krotov
    and Hopfield 2016 (Dense Associative Memory) and the Energy Transformer if the tied-down block does anything.
 4. Optional GPU sessions, in value order: `--run bench` (S and M; needs the tied arms added to `bench.py`),

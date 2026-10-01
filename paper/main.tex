@@ -288,6 +288,44 @@ throughput figures belong in the appendix with bench.py's numbers.}
   \label{fig:context_rank}
 \end{figure}
 
+\paragraph{Why the gate is compressible after training.} Logging the stable rank
+$\|\mW\|_F^2 / \|\mW\|_2^2$ of every projection during dense training (Figure~\ref{fig:spectra},
+Table~\ref{tab:spectra}) shows the gate concentrating early: its stable rank, averaged over layers, falls by
+more than a factor of three in the first third of training and then stays flat, while the up-projection falls
+by a third and the down-projection rises. By the number of singular values that hold 90\% of the energy the
+three projections end alike, so the gate keeps a full tail under a few dominant directions. This is the
+mechanism behind Exp.~A: training concentrates the gate, so a whitened truncation of the trained gate removes
+little. It also says why Exp.~B fails: a rank-$r$ parametrization has no tail to train with. In the relu
+self-gate, the single matrix concentrates like a gate (its stable rank falls below the dense gate's) and only
+18\% of hidden units are active per token, against 100\% for SwiGLU, whose silu never reaches zero.
+\todo{Warm starts at 50--90\% (session 10) test whether truncation after concentration is harmless; the
+25\% warm start, already after the collapse, was not. Cite the stable-rank definition.}
+
+\paragraph{Selective and quadratic, in one direction.} The self-gate's unit $\mathrm{relu}(z)\,z$ is
+selective (it switches off) and quadratic in one direction. Removing either property at the same parameter
+count fails: a relu FFN $\mathrm{relu}(z)$ (selective, linear) ends at \meanReluFfn{}, behind SwiGLU shrunk;
+$z|z|$ (quadratic, not selective) and a bilinear block $(\mW_{\mathrm{gate}}\vx)\odot(\mW_{\mathrm{up}}\vx)$
+(two directions, no activation) were stopped by the early-kill rule at 0.10 and 0.04 behind shrunk at 44\% of
+training. Tying the down-projection to the up-projection, one matrix per block at 2400 units, was stopped at
+0.10 behind: the down-projection must be free. Two reruns of finished arms on the same GPU and seed moved by
+0.002, a tenth of the smallest effect reported here.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.5\linewidth]{figures/spectra.pdf}
+  \caption{Stable rank of each projection during dense training at size S, averaged over the six layers. The
+  gate concentrates in the first third of training; the down-projection does not.}
+  \label{fig:spectra}
+\end{figure}
+
+\begin{table}[t]
+  \centering
+  \caption{Stable rank (mean over layers) of the three projections at four points of dense training, size S.}
+  \label{tab:spectra}
+  \small
+  \input{tables/spectra.tex}
+\end{table}
+
 \paragraph{Reading Exp.~A and Exp.~B together.} The projection that tolerates truncation best after
 training (the gate, Section~\ref{sec:expa}) is not the one that trains best at low rank (gate and
 up-projection tie, both behind a narrower dense block), and the projection most fragile after training (up)

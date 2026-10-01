@@ -67,6 +67,11 @@ STEPS = {   # name -> (heading, command, note)
                 "relu self-gate; the quadratic-vs-gating 2x2 (relu FFN, z|z|, bilinear); warm starts at 50% and 75%; "
                 "the down-projection tied to the up-projection (one matrix, 2400 units) at three seeds "
                 "(grid.py screen4_arms). Reference: S_shrunk_r4 s0/s1/s2 = 4.1043 / 4.1043 / 4.1124."),
+    "screen5": ("Experiment B: late warm starts (whitening fixed), spectra of thin gate and shrunk, starved seeds",
+                "python cloud_run.py grid --stage screen5 --max_hours 11",
+                "Warm starts at 50%, 75% and 90% (dense gate, then rank d/4 by whitened SVD; the eigendecomposition "
+                "fallback replaces the Cholesky that failed in session 9), spectra reruns of thin_gate_r4 and shrunk_r4, "
+                "seeds 1-2 of tied_gate_relu_w600. References: S_thin_gate_r4_s0 = 4.1250, S_shrunk_w400 s1/s2 = 4.1535 / 4.1608."),
     "lr": ("Experiment B: learning-rate check", "python cloud_run.py grid --stage lr --max_hours 11", ""),
     "heal": ("Experiment C: truncate, then train only the new factors", "python cloud_run.py heal", ""),
     "bench": ("Measured speed and memory of every arm", "python cloud_run.py bench", ""),

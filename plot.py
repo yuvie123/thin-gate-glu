@@ -217,7 +217,7 @@ def write_macros(by, out_dir):
         macros["thinFracOfDense"] = f"{100 * t['mlp'] / S['dense'][0]['params']['mlp']:.0f}" if "dense" in S else "?"
     for arm in ("shrunk_r4", "thin_gate_r4", "thin_up_r4", "thin_down_r4", "shrunk_r2", "reinvest_r4", "all_lowrank_r4",
                 "tied_gate_relu", "thin_tied_gate_r4", "tied_gate", "shared_gate", "shrunk_w400", "tied_gate_w600",
-                "shrunk_relu_r4", "tied_gate_relu_w600", "thin_tied_relu_r4", "pair_tied_relu"):
+                "shrunk_relu_r4", "tied_gate_relu_w600", "thin_tied_relu_r4", "pair_tied_relu", "relu_ffn"):
         if arm in S:
             key = "".join(w.capitalize() for w in arm.split("_")).replace("2", "Two").replace("4", "Four").replace("8", "Eight").replace("600", "Sixh").replace("00", "h")
             macros[f"mean{key}"] = f"{m(arm):.4f}"
@@ -275,6 +275,57 @@ def plot_context_rank(by, out_dir):
     path = os.path.join(out_dir, "figures", "context_rank.pdf")
     fig.savefig(path)
     plt.close(fig)
+    print("wrote", path)
+
+
+def plot_spectra(runs, out_dir):
+    """Stable rank of gate, up and down over training (mean over layers), from the runs that logged spectra."""
+    name = "S_dense_spec_s0"
+    r = next((x for x in runs if x["name"] == name), None)
+    if r is None or "spectra" not in r["log"]:
+        return
+    fig, ax = plt.subplots(figsize=(3.3, 2.3))
+    for proj, (color, marker, ls, label) in STYLE.items():
+        key = proj.split("_")[0]
+        pts = [(e["step"], statistics.mean(e["stable_rank"][key])) for e in r["log"]["spectra"] if key in e["stable_rank"]]
+        if pts:
+            ax.plot(*zip(*pts), color=color, marker=marker, ls=ls, lw=1.5, ms=3, label=label, markevery=3)
+    ax.set_xlabel("training step")
+    ax.set_ylabel("stable rank (mean over layers)")
+    ax.grid(True, axis="y")
+    ax.legend(frameon=False, title="projection")
+    fig.tight_layout()
+    path = os.path.join(out_dir, "figures", "spectra.pdf")
+    fig.savefig(path)
+    plt.close(fig)
+    print("wrote", path)
+    sp = r["log"]["spectra"]
+    lines = ["\\begin{tabular}{lrrrr}", "\\toprule", "Projection & step 250 & step 1000 & step 2500 & final \\\\", "\\midrule"]
+    by_step = {e["step"]: e for e in sp}
+    cols = [250, 1000, 2500, sp[-1]["step"]]
+    for key in ("gate", "up", "down"):
+        cells = " & ".join(f"{statistics.mean(by_step[c]['stable_rank'][key]):.0f}" if c in by_step else "--" for c in cols)
+        lines.append(f"{key} & {cells} \\\\")
+    lines += ["\\bottomrule", "\\end{tabular}"]
+    path = os.path.join(out_dir, "tables", "spectra.tex")
+    open(path, "w").write("\n".join(lines) + "\n")
+    print("wrote", path)
+
+
+def table_bench(results, out_dir):
+    if not results:
+        return
+    lines = ["\\begin{tabular}{llrrrr}", "\\toprule",
+             "Size & Arm & MLP params & Train tok/s & Prefill tok/s & Peak GB \\\\", "\\midrule"]
+    for r in sorted(results, key=lambda r: r["size"]):
+        for row in r["rows"]:
+            lines.append(f"{r['size']} & {row['arm'].replace('_', ' ')} & {row['mlp']:,} & {row['train_tokens_per_s']:,.0f} & "
+                         f"{row['prefill_tokens_per_s']:,.0f} & {row['peak_train_memory_gb'] or 0:.2f} \\\\")
+        lines.append("\\midrule")
+    lines[-1] = "\\bottomrule"
+    lines.append("\\end{tabular}")
+    path = os.path.join(out_dir, "tables", "bench.tex")
+    open(path, "w").write("\n".join(lines) + "\n")
     print("wrote", path)
 
 
@@ -378,9 +429,12 @@ if __name__ == "__main__":
     posthoc = [r for r in found if "records" in r]
     training = [r for r in found if "final_val_loss" in r and not r.get("killed")]   # early-killed runs stay out
     heal = [r for r in found if "ppl_healed" in r]
+    bench = [r for r in found if "rows" in r and "size" in r]
     print(f"found {len(posthoc)} post-hoc, {len(training)} training, {len(heal)} healing result files")
     for method in ("plain", "whiten"):
         plot_posthoc(posthoc, method, args.out_dir)
         plot_posthoc(posthoc, method, args.out_dir, xkey="param_ratio")
     plot_training(training, args.out_dir)
+    plot_spectra(training, args.out_dir)
     table_heal(heal, args.out_dir)
+    table_bench(bench, args.out_dir)

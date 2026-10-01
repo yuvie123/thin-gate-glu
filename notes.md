@@ -1227,3 +1227,63 @@ free seed-0 replicate of the relu self-gate (run-to-run nondeterminism on the sa
 the paper tables (`plot.py` drops `_spec_`). 11 runs, about 8 h; order: the two spectra reruns, the H3 arm,
 the 2x2 cells, the two warm starts, the H3 ablation, then H3 seeds 1-2. Tests 19/19 (tied-down forward with
 the gain, step = relu FFN, abs = z|z|, bilinear, spectra and activity probes); baseline smoke curve unchanged.
+
+## 2026-10-01
+
+### 2026-10-01: Kaggle session 9 taken in: the gate sheds its rank early; H2 settled; H3 falsified; warm starts crashed
+
+Zip renamed `thin_gate_results_session9_screen4.zip` (browser name `thin_gate_results (8).zip`). Session ran
+17:18 to 21:10 UTC Sep 30, 3.9 h; checks ok (19/19, all smokes). 11 planned runs: 3 finished to the end, 4
+killed at step 2000 by the reference rule, 2 crashed (the warm starts, see below), 2 skipped (seeds 1-2 of a
+killed arm). No nan or inf anywhere. 114 files; 96 carried byte-identical; 7 new (the two crashed runs wrote
+no JSON and will be rerun).
+
+**Run-to-run noise on the same GPU, same seed:** dense s0 4.0867 -> rerun 4.0848 (-0.002); relu self-gate s0
+4.0814 -> rerun 4.0832 (+0.002). Nondeterministic kernels move a result by about 0.002, a tenth of the effects
+the paper rests on. Worth one sentence in the paper.
+
+**H1 (rank is shed during training), part (a): CONFIRMED, and stronger than predicted.** In the dense model the
+gate's stable rank (mean over layers) falls from 96 at step 250 to 33 at step 1000 and 27 by step 1750, then
+stays flat; the up-projection falls from 103 to 65; the down-projection *rises* from 38 to 50. Per layer the
+final gate stable ranks are 21-29 in every layer, while up's are 24-98 and down's 35-80. By the 90%-energy rank
+the three projections look alike at the end (240 / 243 / 246 of 384): the gate's spectrum develops a few
+dominant directions on top of a full tail, up's less so, down's not at all. This is the mechanism of Exp. A: the
+gate is the most compressible projection after training because training concentrates it. In the relu
+self-gate the up-projection's stable rank falls to 22, lower than the dense gate's: with one matrix doing both
+jobs, it concentrates like a gate.
+
+**H1, part (b): UNTESTED.** Both warm starts crashed at the swap: the whitened SVD's Cholesky failed on the
+calibration gram, which late in training is finite but so ill-conditioned (a few dominant input channels; the
+same concentration as above, seen from the input side) that no ridge up to the mean diagonal fixed it in
+float32. Fixed in `posthoc_truncate.factorize`: double precision, and an eigendecomposition square root when
+Cholesky fails; a non-finite gram falls back to plain SVD; new test with a singular gram. The two runs and a 90%
+warm start go to session 10. Note that the 25% warm start (4.1233, session 4) already truncated *after* the
+gate's stable rank had collapsed (step 1144 > step 1000), and it still lost: so a low stable rank is not enough
+for a rank-96 truncation to be harmless. Whether anything is, at 50-90%, is what session 10 asks.
+
+**H2 (quadratic, not gating): SETTLED, with a twist.** At shrunk_r4's budget: relu self-gate relu(z) z 4.081;
+relu FFN relu(z) (selective, linear) 4.115, worse than the self-gate by 0.034 and worse than SwiGLU shrunk
+(4.104); z|z| (quadratic, not selective) killed at +0.096 behind shrunk at 44%; bilinear (Gx)(Ux) at 800
+(two directions, no activation) killed at +0.038. So neither "quadratic" nor "selective" alone explains the
+self-gate: a quadratic unit that cannot switch off is a disaster, a selective unit that is linear is mediocre,
+and the two together are the best block in the study. Bilinear's poor showing contrasts with Shazeer 2020,
+where bilinear GLUs were competitive at T5 scale; at 28M with this recipe it is not. The hypothesis as stated
+("quadratic, not gating") is rejected; the finding is "selective and quadratic, in one direction".
+
+**Activation sparsity (new, from the probe):** the relu self-gate has 17-19% of its hidden units active per
+token from step 1000 on (82% exact zeros), the relu FFN 10%, dense SwiGLU 100% (silu is never exactly zero).
+A block that beats SwiGLU with 78% of the parameters and 18% active units is a strong inference-efficiency
+story; `bench.py` (session 10) measures what the T4 makes of it.
+
+**H3 (one matrix per block): FALSIFIED at size S.** The down-projection tied to the up-projection, 2400 units,
+with or without the per-unit write scale, was 0.10 behind shrunk at 44% of training, the worst gap of any arm
+in the study. The down-projection must be free; writing back along the unit's own key is a severe constraint
+(it is the arm the Exp. B down-projection results already warned about).
+
+**Session 10 (`--run screen5,bench`, built tonight):** warm starts at 50%, 75% and 90% with the fixed
+whitening; spectra reruns of thin_gate_r4 and shrunk_r4 (does a rank-96 gate's product concentrate the same
+way? does a narrower dense gate?); seeds 1-2 of the relu self-gate at the starved budget; then `bench.py` at
+S and M for the speed and memory table (two matmuls, 18% active). About 7 runs and two benchmark jobs, 7-8 h.
+
+`plot.py` now writes `figures/spectra.pdf` and `tables/spectra.tex` from the dense spectra rerun and
+`tables/bench.tex` once benchmarks exist. The paper gets a mechanism paragraph and the figure.

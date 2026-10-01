@@ -16,7 +16,7 @@ import time
 
 import torch
 
-from grid import arms_for
+from grid import arms_for, screen2_arms, screen3_arms
 from model import GPT, GPTConfig, count_params, flops_per_token
 from train import SIZES, pick_amp_dtype
 
@@ -55,10 +55,14 @@ def main():
     autocast = torch.autocast(device_type=device, dtype=amp_dtype)
     rows = []
 
-    for name, arm in arms_for(args.size, (2, 4, 8)).items():
+    every = {**arms_for(args.size, (2, 4, 8)), **screen2_arms(args.size), **screen3_arms(args.size)}
+    keys = ["dense", "shrunk_r4", "thin_gate_r4", "thin_up_r4", "thin_down_r4", "reinvest_r4", "all_lowrank_r4",
+            "tied_gate_relu", "tied_gate", "thin_tied_relu_r4", "shrunk_relu_r4"]
+    cfg_keys = set(GPTConfig.__dataclass_fields__)
+    for name in keys:
+        arm = every[name]
         cfg = GPTConfig(vocab_size=vocab, seq_len=args.seq_len, n_layer=2 if args.smoke else L, n_head=H,
-                        d_model=d, d_ff=arm.get("d_ff", F), gate_rank=arm.get("gate_rank", 0),
-                        up_rank=arm.get("up_rank", 0), down_rank=arm.get("down_rank", 0))
+                        d_model=d, **{"d_ff": F, **{k: v for k, v in arm.items() if k in cfg_keys}})
         model = GPT(cfg).to(device)
         run = torch.compile(model) if (device == "cuda" and not args.no_compile) else model
         x = torch.randint(0, vocab, (args.micro_bs, args.seq_len), device=device)

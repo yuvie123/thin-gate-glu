@@ -216,6 +216,21 @@ def test_pair_tied_gate_forward():
     assert not torch.allclose(m.up.weight[0], m.up.weight[1])
 
 
+def test_whitening_survives_a_singular_gram():
+    """A rank-deficient calibration gram (fewer tokens than channels, or dominant channels) must not crash the
+    swap; the eigendecomposition path must still be exact at full rank."""
+    torch.manual_seed(0)
+    W = torch.randn(24, 16)
+    X = torch.randn(5, 16)                      # 5 tokens for 16 channels: the gram is singular
+    gram = X.T @ X
+    U, s, V = factorize(W, gram)
+    approx = (U * s) @ V
+    assert torch.allclose(approx @ X.T, W @ X.T, atol=1e-3), "full-rank whitened factorization must reproduce W X"
+    bad = gram.clone(); bad[0, 0] = float("inf")
+    U, s, V = factorize(W, bad)                 # non-finite gram: plain SVD, no crash
+    assert torch.allclose((U * s) @ V, W, atol=1e-4)
+
+
 def test_tied_down_and_extra_activations():
     """One-matrix block: out = (act(z) z * s) @ U with U the up weight; step tie = plain relu FFN; abs tie = z|z|."""
     torch.manual_seed(0)
