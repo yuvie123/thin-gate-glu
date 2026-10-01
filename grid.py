@@ -18,8 +18,9 @@ Stages follow the day-by-day plan:
             says what the screen-2 win means (relu in a dense gate), then one-seed diagnostics
     screen4 size S: mechanism session: spectra reruns, the quadratic-vs-gating 2x2, late warm starts, the
             down-projection tied to the up-projection (see screen4_arms)
-    screen5 size S: the late warm starts again (whitening fixed), spectra of the thin gate and of shrunk, seeds 1-2
-            of the starved pair, and a 90% warm start
+    screen5 size S: warm starts at 50/75/90% (whitening fixed) plus the keep-dense control at 50% (truncate in place,
+            stay dense: does the gate need its tail to train or to represent?), spectra of the thin gate and of
+            shrunk, seeds 1-2 of the starved pair
 
 Arms (r = rank, d = d_model, F = default d_ff):
     dense            standard SwiGLU
@@ -253,11 +254,12 @@ def runs_for(stage):
         add("S", list(arms), [0], arms=arms)      # priority order: the launch deadline drops the tail
     elif stage == "screen5":
         s2, s3, s4 = screen2_arms("S"), screen3_arms("S"), screen4_arms("S")
-        plan = [("warm_gate_r4_f50", s4["warm_gate_r4_f50"], 0, {}), ("warm_gate_r4_f75", s4["warm_gate_r4_f75"], 0, {}),
+        plan = [("warm_gate_r4_f50", s4["warm_gate_r4_f50"], 0, {}),
+                ("warm_dense_r4_f50", {"gate_rank": 96, "thin_at": 0.5, "thin_keep_dense": 1}, 0, {}),   # the control
+                ("warm_gate_r4_f75", s4["warm_gate_r4_f75"], 0, {}), ("warm_gate_r4_f90", {"gate_rank": 96, "thin_at": 0.9}, 0, {}),
                 ("thin_gate_r4_spec", {"gate_rank": 96}, 0, {}), ("shrunk_r4_spec", {"d_ff": 800}, 0, {}),
                 ("tied_gate_relu_w600", s3["tied_gate_relu_w600"], 1, {"ref_json": "results/train/S_shrunk_w400_s1.json"}),
-                ("tied_gate_relu_w600", s3["tied_gate_relu_w600"], 2, {"ref_json": "results/train/S_shrunk_w400_s2.json"}),
-                ("warm_gate_r4_f90", {"gate_rank": 96, "thin_at": 0.9}, 0, {})]
+                ("tied_gate_relu_w600", s3["tied_gate_relu_w600"], 2, {"ref_json": "results/train/S_shrunk_w400_s2.json"})]
         for a, arm, seed, extra in plan:
             out.append((f"S_{a}_s{seed}", "S", arm, seed, extra))
     elif stage == "screen4":

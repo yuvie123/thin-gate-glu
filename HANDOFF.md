@@ -173,9 +173,10 @@ run log and the place where every decision is recorded.
 
 ### Next, in order
 1. ~~Sessions 2-8~~ done. Size S complete (main grid, three screens); size M key arms at two seeds. **GO.**
-2. **Session 10 (built 2026-10-01, upload next): `make_cloud_notebook.py --run screen5,bench`.** Warm starts
-   at 50/75/90% (H1 part b), spectra of thin_gate_r4 and shrunk_r4, seeds 1-2 of the starved pair, then
-   `bench.py` at S and M. About 7-8 h. Take in as usual.
+2. **Session 10 (rebuilt 2026-10-01 evening, upload next): `make_cloud_notebook.py --run bench,screen5`.** Bench
+   at S and M first; then warm starts at 50/75/90%, the keep-dense control at 50% (tail needed to train or to
+   represent?), spectra reruns of thin_gate_r4 and shrunk_r4 with the seven-matrix probe, starved seeds 1-2.
+   About 8.5 h. Take in as usual; the prediction for the control is in `notes.md` 2026-10-01 later.
 3. **Reading remains the critical path:** Primer first, then Shazeer 2020, xIELU, MGLU, WeLore, and now Krotov
    and Hopfield 2016 (Dense Associative Memory) and the Energy Transformer if the tied-down block does anything.
 4. Optional GPU sessions, in value order: `--run bench` (S and M; needs the tied arms added to `bench.py`),

@@ -67,6 +67,9 @@ def get_args():
     ap.add_argument("--kill_steps", default="2000:0.015,3000:0.010",
                     help="step:margin pairs for --ref_json (backtested on the size-S grid, see notes.md 2026-09-22)")
     ap.add_argument("--expect_killed", action="store_true", help="smoke check: fail unless the kill rule fired")
+    ap.add_argument("--thin_keep_dense", type=int, default=0,
+                    help="with --thin_at: 1 truncates the gate in place at the swap but keeps it dense and trainable "
+                         "(the control that separates 'the tail is needed to train' from 'needed to represent')")
     ap.add_argument("--thin_at", type=float, default=0.0,
                     help="warm start: train a DENSE gate for this fraction of the steps, then replace it by a "
                          "rank --gate_rank factorization (whitened SVD) and continue. 0 = off")
@@ -123,6 +126,16 @@ def calibration_blocks(data, n_seqs, seed):
     return torch.from_numpy(np.stack(rows).astype(np.int64))
 
 
+def truncate_in_place(model, rank, grams):
+    """The control for the warm start: project every dense gate onto its rank-r (whitened) approximation but
+    keep the matrix dense and trainable, so the only difference from the warm start is the tail's freedom."""
+    from posthoc_truncate import factorize
+    for b, g in zip(model.blocks, grams):
+        U, s, V = factorize(b.mlp.gate.weight.data, g)
+        W = (U[:, :rank] * s[:rank]) @ V[:rank]
+        b.mlp.gate.weight.data.copy_(W.to(b.mlp.gate.weight.device, b.mlp.gate.weight.dtype))
+
+
 def thin_gates(model, opt, rank, grams, factor_wd):
     """Replace every dense gate by its rank-r factorization (whitened SVD when a gram is given, plain SVD for
     None) and move the optimizer over: the dense weights leave their group and lose their Adam state, every
@@ -146,36 +159,81 @@ def thin_gates(model, opt, rank, grams, factor_wd):
 
 
 @torch.no_grad()
-@torch.no_grad()
-def weight_spectra(model):
-    """Stable rank ||W||_F^2 / ||W||_2^2 and the number of singular values holding 90% of the squared energy,
-    per layer, for gate, up and down (dense weights, or the product of low-rank factors)."""
-    out = {"stable_rank": {}, "r90": {}}
+def _layer_matrices(b, d):
+    """The seven weight matrices of a block as [out, in] tensors (None where absent or tied), input side last."""
+    mats = {}
     for proj in ("gate", "up", "down"):
-        sr, r90 = [], []
-        for b in model.blocks:
-            m = getattr(b.mlp, proj, None)
-            if m is None or (proj == "gate" and b.mlp.tied and b.mlp.gate is None):
-                W = None
-            elif isinstance(m, LowRankLinear):
-                W = m.B.weight.float() @ m.A.weight.float()
-            elif isinstance(m, torch.nn.Linear):
-                W = m.weight.float()
-            else:
-                W = None
+        m = getattr(b.mlp, proj, None)
+        if m is None or (proj == "gate" and b.mlp.tied and b.mlp.gate is None):
+            W = None
+        elif isinstance(m, LowRankLinear):
+            W = m.B.weight.float() @ m.A.weight.float()
+        elif isinstance(m, torch.nn.Linear):
+            W = m.weight.float()
+        else:
+            W = None
+        mats[proj] = W
+    qkv = b.attn.qkv.weight.float()
+    mats["q"], mats["k"], mats["v"] = qkv[:d], qkv[d:2 * d], qkv[2 * d:]
+    mats["o"] = b.attn.proj.weight.float()
+    return mats
+
+
+TOP = 32          # size of the "dominant subspace" tracked for drift and alignment
+
+
+@torch.no_grad()
+def weight_spectra(model, state=None):
+    """Per layer, for gate/up/down and q/k/v/o: stable rank ||W||_F^2/||W||_2^2, the number of singular values
+    holding 90% of the energy, the entropy effective rank, the energy in the top 8/32/96 directions, the overlap
+    of the top-32 right-singular subspace with the previous eval's (drift; 1 = unchanged), and for the gate its
+    overlap with the up-projection's top-32 subspace. `state` keeps the previous subspaces between calls."""
+    d = model.cfg.d_model
+    keys = ("stable_rank", "r90", "erank", "top8", "top32", "top96", "drift")
+    out = {k: {} for k in keys}
+    out["gate_up_align"] = []
+    prev = state if state is not None else {}
+    for i, b in enumerate(model.blocks):
+        mats = _layer_matrices(b, d)
+        subspaces = {}
+        for proj, W in mats.items():
             if W is None:
                 continue
-            s2 = torch.linalg.svdvals(W) ** 2
-            sr.append((s2.sum() / s2[0]).item())
-            r90.append(int((torch.cumsum(s2, 0) < 0.9 * s2.sum()).sum().item()) + 1)
-        if sr:
-            out["stable_rank"][proj], out["r90"][proj] = sr, r90
+            _, s, Vh = torch.linalg.svd(W, full_matrices=False)
+            s2 = s ** 2
+            p = s2 / s2.sum()
+            vals = {"stable_rank": (s2.sum() / s2[0]).item(),
+                    "r90": int((torch.cumsum(s2, 0) < 0.9 * s2.sum()).sum().item()) + 1,
+                    "erank": torch.exp(-(p * torch.log(p.clamp_min(1e-12))).sum()).item(),
+                    "top8": p[:8].sum().item(), "top32": p[:32].sum().item(), "top96": p[:96].sum().item()}
+            top = Vh[:TOP]
+            subspaces[proj] = top
+            old = prev.get((i, proj))
+            vals["drift"] = ((top @ old.T) ** 2).sum().item() / top.shape[0] if old is not None else None
+            for k, v in vals.items():
+                out[k].setdefault(proj, []).append(v)
+        if "gate" in subspaces and "up" in subspaces:
+            k = min(subspaces["gate"].shape[0], subspaces["up"].shape[0])
+            out["gate_up_align"].append(((subspaces["gate"] @ subspaces["up"].T) ** 2).sum().item() / k)
+        for proj, top in subspaces.items():
+            prev[(i, proj)] = top
+    if state is not None:
+        state.update(prev)
     return out
 
 
 @torch.no_grad()
 def active_fraction(model, data, args, device, autocast):
-    """Fraction of nonzero hidden activations per layer on one validation batch (uncompiled model)."""
+    """Per layer, on one validation batch of the uncompiled model: the fraction of nonzero hidden activations and
+    the entropy effective rank of the MLP input's covariance (concentration seen from the input side)."""
+    grams = {}
+
+    def pre_hook(mod, inputs):
+        x = inputs[0].reshape(-1, inputs[0].shape[-1]).float()
+        with torch.autocast(device_type=x.device.type, enabled=False):     # keep the gram in float32
+            grams[id(mod)] = x.T @ x
+
+    handles = [b.mlp.register_forward_pre_hook(pre_hook) for b in model.blocks]
     for b in model.blocks:
         b.mlp.record_stats = True
     model.eval()
@@ -184,9 +242,15 @@ def active_fraction(model, data, args, device, autocast):
         model(x.to(device), y.to(device))
     model.train()
     fr = [b.mlp.last_active for b in model.blocks]
+    erank = []
     for b in model.blocks:
+        ev = torch.linalg.eigvalsh(grams[id(b.mlp)]).clamp_min(0)
+        p = ev / ev.sum()
+        erank.append(torch.exp(-(p * torch.log(p.clamp_min(1e-12))).sum()).item())
         b.mlp.record_stats = False
-    return fr
+    for h in handles:
+        h.remove()
+    return fr, erank
 
 
 @torch.no_grad()
@@ -292,6 +356,7 @@ def main():
         calib_blocks = calibration_blocks(data, 8 * args.micro_bs, seed=args.seed + 10_000)
 
     log = {"train": [], "val": []}
+    spectra_state = {}
     ref_curve, ref_name, killed = {}, None, None
     kill_steps = {int(k): float(m) for k, m in (kv.split(":") for kv in args.kill_steps.split(",") if kv)}
     if args.ref_json:
@@ -315,8 +380,12 @@ def main():
             with torch.no_grad(), autocast:
                 grams = collect_grams(model, [b.mlp.gate for b in model.blocks], calib_blocks, args.micro_bs)
             model.train()
-            thin_gates(model, opt, args.gate_rank, grams, factor_wd)
-            model.cfg = cfg
+            if args.thin_keep_dense:
+                truncate_in_place(model, args.gate_rank, grams)
+                model.cfg = dataclasses.replace(cfg, gate_rank=0)
+            else:
+                thin_gates(model, opt, args.gate_rank, grams, factor_wd)
+                model.cfg = cfg
             if step_model is not model:
                 torch._dynamo.reset()
                 step_model = torch.compile(model)
@@ -359,8 +428,8 @@ def main():
             log["val"].append({"step": step + 1, "loss": val})
             print(f"[{args.name}] step {step + 1}  VAL loss {val:.4f}")
             if args.log_spectra:
-                spec = weight_spectra(model)
-                spec["step"], spec["active"] = step + 1, active_fraction(model, data, args, device, autocast)
+                spec = weight_spectra(model, spectra_state)
+                spec["step"], (spec["active"], spec["input_erank"]) = step + 1, active_fraction(model, data, args, device, autocast)
                 log.setdefault("spectra", []).append(spec)
                 g = spec["stable_rank"].get("gate"); u = spec["stable_rank"].get("up")
                 print(f"[{args.name}]   stable rank gate {g and round(sum(g) / len(g), 1)} up {u and round(sum(u) / len(u), 1)}"
@@ -382,12 +451,14 @@ def main():
         torch.cuda.synchronize()
     wall = time.time() - t_start
     max_preact = max_up_preactivation(model, data, args, device, autocast)
+    for b in model.blocks:
+        b.mlp.record_stats = False
     tok_per_s = timed_tokens / (time.time() - t_timed) if t_timed and timed_tokens else None
 
     result = {
         "name": args.name,
         "args": vars(args),
-        "config": config_dict(cfg),
+        "config": config_dict(model.cfg),         # the final model (the keep-dense control ends with a dense gate)
         "params": count_params(model),                  # the final model (differs from the start only for --thin_at)
         "flops_per_token": flops_per_token(model),
         "params_initial": params_initial,

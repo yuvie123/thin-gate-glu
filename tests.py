@@ -254,12 +254,26 @@ def test_tied_down_and_extra_activations():
 
 
 def test_weight_spectra_and_activity():
-    from train import weight_spectra
+    from train import weight_spectra, truncate_in_place
     torch.manual_seed(0)
     model = GPT(GPTConfig(n_layer=2, n_head=2, d_model=16, d_ff=24, seq_len=32, gate_tie="up", gate_act="relu"))
-    spec = weight_spectra(model)
-    assert set(spec["stable_rank"]) == {"up", "down"} and len(spec["stable_rank"]["up"]) == 2, "tied gate has no gate matrix"
+    state = {}
+    spec = weight_spectra(model, state)
+    assert set(spec["stable_rank"]) == {"up", "down", "q", "k", "v", "o"} and len(spec["stable_rank"]["up"]) == 2
     assert all(1 <= r <= 16 for r in spec["r90"]["up"]) and all(1 <= s <= 16 for s in spec["stable_rank"]["up"])
+    assert all(1 <= e <= 16.01 for e in spec["erank"]["up"]) and all(0 < t <= 1 for t in spec["top8"]["q"])
+    assert spec["drift"]["up"] == [None, None] and spec["gate_up_align"] == [], "first call: no previous subspace, no gate"
+    spec2 = weight_spectra(model, state)
+    assert all(abs(x - 1) < 1e-4 for x in spec2["drift"]["up"]), "unchanged weights: the dominant subspace does not drift"
+    dense = GPT(GPTConfig(n_layer=2, n_head=2, d_model=16, d_ff=24, seq_len=32))
+    sd = weight_spectra(dense, {})
+    assert len(sd["gate_up_align"]) == 2 and all(0 <= a <= 1 for a in sd["gate_up_align"])
+    x = torch.randint(0, 512, (2, 8))
+    before = dense(x).clone()
+    truncate_in_place(dense, 16, [None, None])              # full rank: exact, and the gate stays a dense Linear
+    assert isinstance(dense.blocks[0].mlp.gate, torch.nn.Linear) and torch.allclose(dense(x), before, atol=1e-4)
+    truncate_in_place(dense, 4, [None, None])
+    assert torch.linalg.matrix_rank(dense.blocks[0].mlp.gate.weight) == 4, "in-place truncation to rank 4"
     for b in model.blocks:
         b.mlp.record_stats = True
     model(torch.randint(0, 512, (2, 8)))

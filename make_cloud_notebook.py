@@ -70,8 +70,10 @@ STEPS = {   # name -> (heading, command, note)
     "screen5": ("Experiment B: late warm starts (whitening fixed), spectra of thin gate and shrunk, starved seeds",
                 "python cloud_run.py grid --stage screen5 --max_hours 11",
                 "Warm starts at 50%, 75% and 90% (dense gate, then rank d/4 by whitened SVD; the eigendecomposition "
-                "fallback replaces the Cholesky that failed in session 9), spectra reruns of thin_gate_r4 and shrunk_r4, "
-                "seeds 1-2 of tied_gate_relu_w600. References: S_thin_gate_r4_s0 = 4.1250, S_shrunk_w400 s1/s2 = 4.1535 / 4.1608."),
+                "fallback replaces the Cholesky that failed in session 9) and the keep-dense control at 50% (same "
+                "truncation, matrix stays dense: tail needed to train, or to represent?), spectra reruns of thin_gate_r4 "
+                "and shrunk_r4 (every run now logs seven matrices per layer: rank measures, subspace drift, gate-up "
+                "alignment, input covariance rank), seeds 1-2 of tied_gate_relu_w600. References: S_thin_gate_r4_s0 = 4.1250, S_shrunk_w400 s1/s2 = 4.1535 / 4.1608."),
     "lr": ("Experiment B: learning-rate check", "python cloud_run.py grid --stage lr --max_hours 11", ""),
     "heal": ("Experiment C: truncate, then train only the new factors", "python cloud_run.py heal", ""),
     "bench": ("Measured speed and memory of every arm", "python cloud_run.py bench", ""),

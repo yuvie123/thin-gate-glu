@@ -1287,3 +1287,26 @@ S and M for the speed and memory table (two matmuls, 18% active). About 7 runs a
 
 `plot.py` now writes `figures/spectra.pdf` and `tables/spectra.tex` from the dense spectra rerun and
 `tables/bench.tex` once benchmarks exist. The paper gets a mechanism paragraph and the figure.
+
+### 2026-10-01, later: session 10 sharpened (author: perfect the next session so it can carry a breakthrough)
+
+What the mechanism claim still lacked was the *why*: does the gate need its spectral tail to train, or to
+represent what it learned? The warm starts alone cannot say. Added the control that can: `warm_dense_r4_f50`
+truncates the dense gate at 50% exactly as the warm start does (whitened, rank 96) but keeps the matrix dense
+and trainable (`train.py --thin_keep_dense`). *Prediction:* it recovers to dense level (about 4.087) while the
+warm start at 50% does not, which would show the tail is training workspace, not representation. If both land
+together, the loss at the swap is what the truncation threw away and the tail is representation after all.
+
+The probe is now the full picture rather than one number. At every eval, for the seven matrices of each layer
+(gate, up, down, q, k, v, o): stable rank, 90%-energy rank, entropy effective rank, energy in the top 8 / 32 /
+96 directions, the overlap of the top-32 right-singular subspace with the previous eval's (drift; 1 = frozen),
+and for the gate its overlap with the up-projection's top-32 subspace (does tying make sense because they
+concentrate on the same directions?). Plus, per layer, the entropy effective rank of the MLP input's
+covariance on a validation batch (concentration seen from the input side; this is what broke the Cholesky).
+WeLore reports from Hessian gaps that q, k and the gate are the low-rank projections; the training curve of all
+seven either confirms that directly or does not. The JSON grows by about 6 KB per run.
+
+Order: `bench` first (it cannot fall off the deadline), then screen5: warm 50%, keep-dense 50%, warm 75%, warm
+90%, thin-gate and shrunk spectra reruns, starved seeds 1-2. Tests 20/20 (new: drift is 1 for unchanged
+weights, alignment in [0, 1], in-place truncation exact at full rank and rank-4 at rank 4); baseline smoke
+curve unchanged; keep-dense smoke trains and ends with a dense gate in its config.
