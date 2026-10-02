@@ -21,6 +21,8 @@ Stages follow the day-by-day plan:
     screen5 size S: warm starts at 50/75/90% (whitening fixed) plus the keep-dense control at 50% (truncate in place,
             stay dense: does the gate need its tail to train or to represent?), spectra of the thin gate and of
             shrunk, seeds 1-2 of the starved pair
+    screen6 size S: the keep-dense control for up and down (which projection's tail does training need most?) and at
+            25% / 75%; end-of-training truncation probes (Exp. A on our own models) for dense, shrunk and the self-gate
 
 Arms (r = rank, d = d_model, F = default d_ff):
     dense            standard SwiGLU
@@ -252,6 +254,18 @@ def runs_for(stage):
     elif stage == "screen":
         arms = screen_arms("S")
         add("S", list(arms), [0], arms=arms)      # priority order: the launch deadline drops the tail
+    elif stage == "screen6":
+        s2 = screen2_arms("S")
+        probe = {"final_probe": "0.5,0.25,0.125"}
+        plan = [("dense_probe", {**probe}, 0, {}),
+                ("warm_dense_up_f50", {"gate_rank": 96, "thin_at": 0.5, "thin_keep_dense": 1, "thin_proj": "up"}, 0, {}),
+                ("warm_dense_down_f50", {"gate_rank": 96, "thin_at": 0.5, "thin_keep_dense": 1, "thin_proj": "down"}, 0, {}),
+                ("warm_dense_r4_f25", {"gate_rank": 96, "thin_at": 0.25, "thin_keep_dense": 1}, 0, {}),
+                ("warm_dense_r4_f75", {"gate_rank": 96, "thin_at": 0.75, "thin_keep_dense": 1}, 0, {}),
+                ("shrunk_r4_probe", {"d_ff": 800, **probe}, 0, {}),
+                ("tied_gate_relu_probe", {**s2["tied_gate_relu"], **probe}, 0, {})]
+        for a, arm, seed, extra in plan:
+            out.append((f"S_{a}_s{seed}", "S", arm, seed, extra))
     elif stage == "screen5":
         s2, s3, s4 = screen2_arms("S"), screen3_arms("S"), screen4_arms("S")
         plan = [("warm_gate_r4_f50", s4["warm_gate_r4_f50"], 0, {}),

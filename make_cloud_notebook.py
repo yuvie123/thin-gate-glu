@@ -74,6 +74,11 @@ STEPS = {   # name -> (heading, command, note)
                 "truncation, matrix stays dense: tail needed to train, or to represent?), spectra reruns of thin_gate_r4 "
                 "and shrunk_r4 (every run now logs seven matrices per layer: rank measures, subspace drift, gate-up "
                 "alignment, input covariance rank), seeds 1-2 of tied_gate_relu_w600. References: S_thin_gate_r4_s0 = 4.1250, S_shrunk_w400 s1/s2 = 4.1535 / 4.1608."),
+    "screen6": ("Experiment B: which tail does training need? plus Exp. A on our own models",
+                "python cloud_run.py grid --stage screen6 --max_hours 11",
+                "Keep-dense truncation at 50% of up and of down (the gate's gave 4.0895 vs 4.1168 low-rank), of the gate "
+                "at 25% and 75%; and dense, shrunk and the relu self-gate with a final whitened-truncation probe of each "
+                "projection at r/d = 1/2, 1/4, 1/8 (grid.py screen6). Bench reruns first with the compile-cache fix."),
     "lr": ("Experiment B: learning-rate check", "python cloud_run.py grid --stage lr --max_hours 11", ""),
     "heal": ("Experiment C: truncate, then train only the new factors", "python cloud_run.py heal", ""),
     "bench": ("Measured speed and memory of every arm", "python cloud_run.py bench", ""),

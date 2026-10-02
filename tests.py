@@ -272,8 +272,13 @@ def test_weight_spectra_and_activity():
     before = dense(x).clone()
     truncate_in_place(dense, 16, [None, None])              # full rank: exact, and the gate stays a dense Linear
     assert isinstance(dense.blocks[0].mlp.gate, torch.nn.Linear) and torch.allclose(dense(x), before, atol=1e-4)
-    truncate_in_place(dense, 4, [None, None])
+    saved = truncate_in_place(dense, 4, [None, None])
     assert torch.linalg.matrix_rank(dense.blocks[0].mlp.gate.weight) == 4, "in-place truncation to rank 4"
+    for b, w in zip(dense.blocks, saved):
+        b.mlp.gate.weight.data.copy_(w)
+    assert torch.allclose(dense(x), before, atol=1e-4), "restoring the saved weights undoes the probe"
+    saved = truncate_in_place(dense, 4, [None, None], proj="down")
+    assert torch.linalg.matrix_rank(dense.blocks[1].mlp.down.weight) == 4 and isinstance(dense.blocks[1].mlp.down, torch.nn.Linear)
     for b in model.blocks:
         b.mlp.record_stats = True
     model(torch.randint(0, 512, (2, 8)))

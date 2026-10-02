@@ -67,6 +67,12 @@ def get_args():
     ap.add_argument("--kill_steps", default="2000:0.015,3000:0.010",
                     help="step:margin pairs for --ref_json (backtested on the size-S grid, see notes.md 2026-09-22)")
     ap.add_argument("--expect_killed", action="store_true", help="smoke check: fail unless the kill rule fired")
+    ap.add_argument("--thin_proj", default="gate", choices=["gate", "up", "down"],
+                    help="with --thin_at: which projection is truncated at the swap (the low-rank swap supports gate only; "
+                         "the keep-dense control supports all three)")
+    ap.add_argument("--final_probe", default="",
+                    help="comma-separated rank fractions, e.g. 0.5,0.25: after training, truncate each dense projection "
+                         "(whitened SVD) to that rank in turn, evaluate, and restore. Exp. A applied to this run's own model")
     ap.add_argument("--thin_keep_dense", type=int, default=0,
                     help="with --thin_at: 1 truncates the gate in place at the swap but keeps it dense and trainable "
                          "(the control that separates 'the tail is needed to train' from 'needed to represent')")
@@ -126,14 +132,42 @@ def calibration_blocks(data, n_seqs, seed):
     return torch.from_numpy(np.stack(rows).astype(np.int64))
 
 
-def truncate_in_place(model, rank, grams):
-    """The control for the warm start: project every dense gate onto its rank-r (whitened) approximation but
-    keep the matrix dense and trainable, so the only difference from the warm start is the tail's freedom."""
+def truncate_in_place(model, rank, grams, proj="gate"):
+    """The control for the warm start: project every dense `proj` matrix onto its rank-r (whitened) approximation
+    but keep it dense and trainable, so the only difference from the warm start is the tail's freedom.
+    Returns the original weights so a probe can restore them."""
     from posthoc_truncate import factorize
+    saved = []
     for b, g in zip(model.blocks, grams):
-        U, s, V = factorize(b.mlp.gate.weight.data, g)
+        m = getattr(b.mlp, proj)
+        saved.append(m.weight.data.clone())
+        U, s, V = factorize(m.weight.data, g)
         W = (U[:, :rank] * s[:rank]) @ V[:rank]
-        b.mlp.gate.weight.data.copy_(W.to(b.mlp.gate.weight.device, b.mlp.gate.weight.dtype))
+        m.weight.data.copy_(W.to(m.weight.device, m.weight.dtype))
+    return saved
+
+
+@torch.no_grad()
+def final_truncation_probe(model, data, args, device, autocast, calib_blocks, fracs):
+    """Exp. A on this run's own final model: for each dense projection and each rank fraction, whitened
+    truncation, one evaluation, restore. Reports the loss after truncation (the untruncated loss is final_val_loss)."""
+    out = {}
+    d = model.cfg.d_model
+    for proj in ("gate", "up", "down"):
+        mods = [getattr(b.mlp, proj, None) for b in model.blocks]
+        if any(m is None or not isinstance(m, torch.nn.Linear) for m in mods):
+            continue
+        model.eval()
+        with autocast:
+            grams = collect_grams(model, mods, calib_blocks, args.micro_bs)
+        model.train()
+        for f in fracs:
+            rank = max(1, int(round(f * d)))
+            saved = truncate_in_place(model, rank, grams, proj)
+            out[f"{proj}@{f:g}"] = evaluate(model, data, args, device, autocast)
+            for m, w in zip(mods, saved):
+                m.weight.data.copy_(w)
+    return out
 
 
 def thin_gates(model, opt, rank, grams, factor_wd):
@@ -311,6 +345,7 @@ def main():
     )
     if args.thin_at > 0:
         assert 0 < args.thin_at < 1 and args.gate_rank > 0, "--thin_at needs 0 < f < 1 and a --gate_rank target"
+        assert args.thin_proj == "gate" or args.thin_keep_dense, "a low-rank swap of up/down is not implemented; use --thin_keep_dense"
         model = GPT(dataclasses.replace(cfg, gate_rank=0)).to(device)      # dense gate for the warm-up
     else:
         model = GPT(cfg).to(device)
@@ -378,10 +413,10 @@ def main():
             val_before = evaluate(step_model, data, args, device, autocast)
             model.eval()
             with torch.no_grad(), autocast:
-                grams = collect_grams(model, [b.mlp.gate for b in model.blocks], calib_blocks, args.micro_bs)
+                grams = collect_grams(model, [getattr(b.mlp, args.thin_proj) for b in model.blocks], calib_blocks, args.micro_bs)
             model.train()
             if args.thin_keep_dense:
-                truncate_in_place(model, args.gate_rank, grams)
+                truncate_in_place(model, args.gate_rank, grams, args.thin_proj)
                 model.cfg = dataclasses.replace(cfg, gate_rank=0)
             else:
                 thin_gates(model, opt, args.gate_rank, grams, factor_wd)
@@ -453,6 +488,11 @@ def main():
     max_preact = max_up_preactivation(model, data, args, device, autocast)
     for b in model.blocks:
         b.mlp.record_stats = False
+    if args.final_probe and not killed:
+        fracs = [float(x) for x in args.final_probe.split(",") if x]
+        probe_blocks = calibration_blocks(data, 8 * args.micro_bs, seed=args.seed + 20_000)
+        log["final_probe"] = final_truncation_probe(model, data, args, device, autocast, probe_blocks, fracs)
+        print(f"[{args.name}] final truncation probe: " + ", ".join(f"{k} {v:.4f}" for k, v in log["final_probe"].items()))
     tok_per_s = timed_tokens / (time.time() - t_timed) if t_timed and timed_tokens else None
 
     result = {

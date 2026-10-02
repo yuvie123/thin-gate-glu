@@ -217,9 +217,10 @@ def write_macros(by, out_dir):
         macros["thinFracOfDense"] = f"{100 * t['mlp'] / S['dense'][0]['params']['mlp']:.0f}" if "dense" in S else "?"
     for arm in ("shrunk_r4", "thin_gate_r4", "thin_up_r4", "thin_down_r4", "shrunk_r2", "reinvest_r4", "all_lowrank_r4",
                 "tied_gate_relu", "thin_tied_gate_r4", "tied_gate", "shared_gate", "shrunk_w400", "tied_gate_w600",
-                "shrunk_relu_r4", "tied_gate_relu_w600", "thin_tied_relu_r4", "pair_tied_relu", "relu_ffn"):
+                "shrunk_relu_r4", "tied_gate_relu_w600", "thin_tied_relu_r4", "pair_tied_relu", "relu_ffn",
+                "warm_gate_r4_f50", "warm_dense_r4_f50", "warm_gate_r4_f90"):
         if arm in S:
-            key = "".join(w.capitalize() for w in arm.split("_")).replace("2", "Two").replace("4", "Four").replace("8", "Eight").replace("600", "Sixh").replace("00", "h")
+            key = "".join(w.capitalize() for w in arm.split("_")).replace("2", "Two").replace("4", "Four").replace("8", "Eight").replace("600", "Sixh").replace("00", "h").replace("F50", "FFifty").replace("F90", "FNinety").replace("F25", "FTwentyfive").replace("F75", "FSeventyfive")
             macros[f"mean{key}"] = f"{m(arm):.4f}"
     # the largest parameter mismatch between an arm and its budget twin, in percent
     if "thin_gate_r4" in S:
@@ -330,7 +331,7 @@ def table_bench(results, out_dir):
 
 
 def plot_training(runs, out_dir):
-    runs = [r for r in runs if "_lr" not in r["name"] and "_spec_" not in r["name"]]   # lr sweep and spectra reruns
+    runs = [r for r in runs if "_lr" not in r["name"] and "_spec_" not in r["name"] and "_probe_" not in r["name"]]   # reruns
     warm = [r for r in runs if "thin_swap" in r.get("log", {})]     # not parameter-matched from step 0
     table_warm_start(warm, out_dir)
     runs = [r for r in runs if r not in warm]
@@ -341,7 +342,11 @@ def plot_training(runs, out_dir):
         size, arm = arm_of(r["name"])
         by_all[size][arm].append(r)
     table_paired(by_all, out_dir)
-    write_macros(by_all, out_dir)
+    with_warm = defaultdict(lambda: defaultdict(list))     # macros may cite warm-started arms too
+    for r in runs + warm:
+        size, arm = arm_of(r["name"])
+        with_warm[size][arm].append(r)
+    write_macros(with_warm, out_dir)
     plot_context_rank(by_all, out_dir)
     for family in ("main", "screen", "starved"):
         by = {size: {a: v for a, v in arms.items() if arm_family(a) == family or (family == "screen" and a == "shrunk_r4")}

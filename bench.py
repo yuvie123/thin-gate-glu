@@ -64,7 +64,11 @@ def main():
         cfg = GPTConfig(vocab_size=vocab, seq_len=args.seq_len, n_layer=2 if args.smoke else L, n_head=H,
                         d_model=d, **{"d_ff": F, **{k: v for k, v in arm.items() if k in cfg_keys}})
         model = GPT(cfg).to(device)
-        run = torch.compile(model) if (device == "cuda" and not args.no_compile) else model
+        if device == "cuda" and not args.no_compile:
+            torch._dynamo.reset()        # torch.compile caches at most 8 variants; without this, arm 8+ silently ran eager
+            run = torch.compile(model)
+        else:
+            run = model
         x = torch.randint(0, vocab, (args.micro_bs, args.seq_len), device=device)
 
         def train_step():

@@ -171,12 +171,18 @@ run log and the place where every decision is recorded.
   whitening gram, now fixed (eigendecomposition fallback, test added); they rerun in session 10 with a 90% one.
   Run-to-run noise on the same GPU is 0.002. The relu self-gate has 18% active units. `notes.md` 2026-10-01.
 
+- **2026-10-02: Kaggle session 10 taken in.** The keep-dense control did what was predicted: the same truncated
+  gate continued dense reaches 4.0895 (dense level), continued at rank 96 reaches 4.1168 (thin-gate level). The
+  gate needs its dimensions to keep training. Later truncation is *worse* (90%: 4.1454) and the swap's loss
+  jump grows with training. Seven-matrix probe: q, k and gate concentrate (WeLore's three), v, o, up, down do
+  not; gate and up dominant subspaces overlap 0.46 vs 0.08 chance. Starved pair at three seeds: self-gate wins
+  (-0.015). **Bench rows 8-11 are invalid (compile cache); fixed, reruns in session 11.** `notes.md` 2026-10-02.
+
 ### Next, in order
 1. ~~Sessions 2-8~~ done. Size S complete (main grid, three screens); size M key arms at two seeds. **GO.**
-2. **Session 10 (rebuilt 2026-10-01 evening, upload next): `make_cloud_notebook.py --run bench,screen5`.** Bench
-   at S and M first; then warm starts at 50/75/90%, the keep-dense control at 50% (tail needed to train or to
-   represent?), spectra reruns of thin_gate_r4 and shrunk_r4 with the seven-matrix probe, starved seeds 1-2.
-   About 8.5 h. Take in as usual; the prediction for the control is in `notes.md` 2026-10-01 later.
+2. **Session 11 (built 2026-10-02, upload next): `make_cloud_notebook.py --run bench,screen6`.** Bench (fixed)
+   first; then the keep-dense control for up and down at 50% and for the gate at 25% / 75%, and dense, shrunk
+   and the self-gate with the end-of-training truncation probe at r/d = 1/2, 1/4, 1/8. About 8 h.
 3. **Reading remains the critical path:** Primer first, then Shazeer 2020, xIELU, MGLU, WeLore, and now Krotov
    and Hopfield 2016 (Dense Associative Memory) and the Energy Transformer if the tied-down block does anything.
 4. Optional GPU sessions, in value order: `--run bench` (S and M; needs the tied arms added to `bench.py`),

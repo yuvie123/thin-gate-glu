@@ -298,8 +298,21 @@ mechanism behind Exp.~A: training concentrates the gate, so a whitened truncatio
 little. It also says why Exp.~B fails: a rank-$r$ parametrization has no tail to train with. In the relu
 self-gate, the single matrix concentrates like a gate (its stable rank falls below the dense gate's) and only
 18\% of hidden units are active per token, against 100\% for SwiGLU, whose silu never reaches zero.
-\todo{Warm starts at 50--90\% (session 10) test whether truncation after concentration is harmless; the
-25\% warm start, already after the collapse, was not. Cite the stable-rank definition.}
+The concentration is not low-rank sufficiency, and a control shows what the remaining dimensions are for.
+Truncating the dense gate to rank $d/4$ at half of training and continuing at that rank ends at
+\meanWarmGateRFourFFifty{}, where a gate trained at rank $d/4$ from the start ends; truncating the same gate
+identically but keeping the matrix dense and trainable ends at \meanWarmDenseRFourFFifty{}, within noise of an
+untouched dense run. The two runs share every weight at the swap, so the gap between them is the freedom of
+the tail over the second half of training and nothing else. Truncating later costs more, not less (a swap at
+90\% of training ends at \meanWarmGateRFourFNinety{}), and the swap's own loss jump grows with training: the
+trained gate's tail carries more as training proceeds, even while its stable rank falls. A gate constrained to
+rank $d/4$ has a loss floor about 0.03 above dense whether the constraint is imposed at step 0 or later.
+\todo{Which projection's tail is needed most, and the end-of-training truncation probe of each projection
+(session 11). Cite the stable-rank definition.} Across the seven matrices of a block, the three that
+concentrate during training are the query, key and gate projections, which are the three WeLore identifies
+from Hessian gaps; value, output, up and down do not. The dominant 32-dimensional subspaces of gate and
+up-projection freeze within the first half of training and overlap each other far above chance, which is why
+tying the gate to the up-projection costs so little. \todo{cite WeLore; figure for the seven matrices.}
 
 \paragraph{Selective and quadratic, in one direction.} The self-gate's unit $\mathrm{relu}(z)\,z$ is
 selective (it switches off) and quadratic in one direction. Removing either property at the same parameter

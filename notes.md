@@ -1310,3 +1310,70 @@ Order: `bench` first (it cannot fall off the deadline), then screen5: warm 50%, 
 90%, thin-gate and shrunk spectra reruns, starved seeds 1-2. Tests 20/20 (new: drift is 1 for unchanged
 weights, alignment in [0, 1], in-place truncation exact at full rank and rank-4 at rank 4); baseline smoke
 curve unchanged; keep-dense smoke trains and ends with a dense gate in its config.
+
+## 2026-10-02
+
+### 2026-10-02: Kaggle session 10 taken in: the tail is needed to keep training; the self-gate wins the starved budget at three seeds; the benchmark is invalid past arm 7
+
+Zip renamed `thin_gate_results_session10_screen5_bench.zip` (browser name `thin_gate_results (9).zip`). Session
+ran 00:39 to 06:06 UTC Oct 2, 5.5 h; checks ok (20/20, all smokes). Bench S and M first (2-3 min each), then
+all 8 runs finished `[ok]`; the whitening fallback fired as designed in the 75% and 90% warm starts (one
+WARNING line each, eigendecomposition square root), no nan or inf. 125 files; 103 carried byte-identical; 10
+new (8 runs, 2 bench JSONs).
+
+**H1 part (b): the prediction held, and the control is the result.** Same dense gate, same whitened
+truncation to rank 96 at step 2288 (val 4.29 -> 4.56 in both runs, identical weights at the swap):
+
+| Run | gate after the swap | final val loss |
+|---|---|---|
+| warm_dense_r4_f50 (control: truncated in place, stays dense and trainable) | dense | **4.0895** |
+| warm_gate_r4_f50 (truncated, stays rank 96) | rank 96 | 4.1168 |
+| dense s0 / dense rerun (no truncation) | dense | 4.0867 / 4.0848 |
+| thin_gate_r4 s0 / rerun (rank 96 from step 0) | rank 96 | 4.1250 / 4.1246 |
+
+The dense matrix recovers to within 0.003-0.005 of an untouched dense run with half the training left; the
+rank-96 matrix ends where the from-scratch thin gate ends. The 0.027 between them is the tail's freedom over
+the second half and nothing else. **A gate constrained to rank d/4 has a loss floor about 0.03-0.04 above
+dense whether the constraint is imposed at step 0 or at any later point; a full-dimensional matrix recovers
+from the same truncation.** The gate needs its dimensions to keep training, not (only) to represent.
+
+The warm-start family also says the opposite of what "late truncation is harmless" would predict: 25% 4.1233,
+50% 4.1168, 75% 4.1286, 90% 4.1454, and the swap's own loss jump *grows* with training (+0.18, +0.27, +0.34,
++0.36). The trained gate's tail carries more, not less, as training proceeds, even while its stable rank
+falls. Low stable rank is not low-rank-sufficiency: the dominant directions hold 46% of the energy at the end
+(top 32 of 384), and a rank-96 truncation of the final gate costs 0.36 nats; training *into* the rank-96
+constraint from the start costs only 0.04. Exp. A's "the gate tolerates truncation best" is a statement about
+relative damage among the three projections, not about the gate being low-rank.
+
+**Seven-matrix probe (dense dynamics from the keep-dense run; mean over layers, stable rank at step 250 ->
+final):** q 14 -> 9.5, k 16 -> 6.6, gate 97 -> 18, o 29 -> 45, down 38 -> 49, v 90 -> 60, up 103 -> 72. The
+three that WeLore flags from Hessian gaps (q, k, gate) are exactly the three that concentrate; v, o, down and
+up do not, or de-concentrate. The dominant 32-dimensional subspaces of gate and up freeze by step 2000
+(overlap between consecutive evals 0.985 -> 0.997) and overlap each other at 0.46 against 0.08 by chance,
+which is why tying the gate to the up-projection costs so little. The MLP input covariance's entropy rank
+*rises* over training (about 60 -> 155 per layer): the residual stream spreads out while the gate concentrates.
+The rank-96 thin gate's product concentrates too (stable rank 34 -> 18, entropy rank 80 -> 70 of 96); shrunk's
+gate concentrates like dense's (84 -> 26).
+
+**Replicates:** thin_gate_r4 4.1250 -> 4.1246, shrunk_r4 4.1043 -> 4.1078. Run-to-run spread now four values:
+-0.002, +0.002, -0.0004, +0.0035.
+
+**Starved budget, three seeds:** the relu self-gate at 600 beats shrunk at 400 by -0.022 / -0.005 / -0.018,
+mean **-0.015**, all three negative: a WIN under the rule, the paper's third positive result (S main budget, M,
+starved S).
+
+**Benchmark: INVALID for every arm after the seventh and must be rerun.** `bench.py` compiled eleven models in
+one process; `torch.compile` keeps at most eight variants per function, so arms 8-11 (the tied, thin+tied and
+relu arms) silently ran eager: half the speed, double the memory (41k vs 78k tok/s, 3.6 vs 1.9 GB). The real
+training runs show the opposite ordering (relu self-gate 67k tok/s vs shrunk 61k in session 6). Fixed with a
+`torch._dynamo.reset()` per arm; the bench step reruns first in session 11. The first seven rows (dense, shrunk,
+thin gate/up/down, reinvest, all-lowrank) are valid: at S the low-rank arms are within 2% of dense in training
+speed, which is the "not faster" result the README anticipated.
+
+**Session 11 (`--run bench,screen6`, built tonight).** Two probes the control result calls for. (1) *Which
+tail does training need?* The keep-dense control for up and for down at 50% (`--thin_proj`), and for the gate
+at 25% and 75%: if up or down recover less than the gate did, the tail's role differs by projection, which
+is the training-time counterpart of Exp. A. (2) *Exp. A on our own models:* `--final_probe 0.5,0.25,0.125`
+truncates each dense projection of the finished model by whitened SVD at three ranks, evaluates and restores
+(dense, shrunk, and the relu self-gate's up and down). This measures representational need directly and
+closes the loop between Exp. A and Exp. B inside one run. 7 runs, about 8 h, plus the two bench jobs.
