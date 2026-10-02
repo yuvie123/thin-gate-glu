@@ -215,6 +215,36 @@ definition |S_dense_s0 - S_dense_s1| gave 0.003). A gap smaller than that is not
 
 After the go, the remaining sessions are `main_S`, `main_M`, then `heal,bench`, and `lr` if quota allows. Zero-shot accuracy for a converted or truncated model is optional: see `lm_eval --help` for tasks such as `arc_easy,hellaswag,piqa`, and only add it once experiments A to C are finished. Experiments freeze on Nov 8. Then run `python plot.py` and write.
 
+## Plan after session 11 (written 2026-10-02 while it runs; the author's call at every step)
+
+**The study is complete at size S for its question.** Eleven sessions, about 100 runs, every arm matched,
+seeded and paired. Whatever session 11 returns, the next step is not another architecture.
+
+**Branch A: rank annealing lands below 4.105.** The rank-d/4 floor was dynamical and the anneal is a method.
+Do: (1) one session, `anneal_gate_r4_e85` seeds 1-2 at S and seed 0-1 at M (rank 128); (2) read Cuttlefish and
+DLRT first (`related.md`), because the anneal lives next to both and the paper must position it honestly:
+Cuttlefish's recipe (factorize at the stable rank once it settles) is what our warm starts tested, and it lost;
+(3) if the anneal holds at M, the paper's title becomes the answer ("GLU gates concentrate but need their
+dimensions to train; anneal, don't cut"), the self-gate stays as the parameter-free alternative. (4) Optional:
+anneal applied to q and k as well, the other two matrices that concentrate.
+
+**Branch B: rank annealing lands near 4.12.** The floor is representational at 300M tokens: no path reaches
+dense loss at rank d/4. Do: (1) nothing more at S; (2) the keep-dense control at M from session 11 is the
+second-size evidence; (3) the paper's claim is "selection concentrates (q, k, gate) but a rank-d/4 gate
+cannot reach dense loss at this budget however it gets there; post-hoc compressibility is relative damage,
+not low-rank sufficiency; the self-gate removes the gate's parameters instead of its rank and wins". One
+optional session: thin gate and dense at 2x tokens (does the floor close with more training?).
+
+**Either branch, the critical path is reading and writing, in this order:** Primer, Shazeer 2020, xIELU,
+WeLore, Cuttlefish, DLRT, MGLU, the bilinear-MLP paper (arXiv 2410.08417); BibTeX exported after each. Then
+Related Work, Method (self-gate, keep-dense control, anneal), Results (A, B at S and M, mechanism), Limitations
+(28M/50M parameters, one dataset, 200-300M tokens, free T4s), Introduction last, abstract with numbers.
+Venue: CPAL 2027 (abstract Nov 23, paper Dec 5) as planned; TMLR as the fallback if the deadline is missed,
+since a 100-run controlled study with a mechanism suits it. Make the repository private before anything else.
+
+**Exp. C (heal) is dropped unless time is left in November:** the keep-dense and warm-start runs already show
+what healing a truncated gate can and cannot do, on our own models, with controls.
+
 ## Rules for this project (non-negotiable)
 1. **Never fabricate or guess** results, citations, or benchmark numbers. Every number in the paper comes from a JSON in `results/` via `plot.py`. `paper/references.bib` entries are exported by the author from the paper's own page after reading it, never written from memory.
 2. Report failures and unflattering results plainly (e.g. low-rank arms not being faster, down beating gate at low rank). A negative result is acceptable; an unsupported claim is an ethics violation.

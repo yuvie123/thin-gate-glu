@@ -107,6 +107,23 @@ reading of it, and the from-scratch architecture. None of this is settled until 
   the candidate contribution. The author must repeat the search on Semantic Scholar and OpenReview before
   the paper calls it new.
 
+## Found 2026-10-02, before the rank-annealing result (abstracts read by the assistant; the author has read NONE)
+- **arXiv 2305.02538, Wang et al. 2023, "Cuttlefish: Low-Rank Model Training without All the Tuning" (MLSys).**
+  MUST READ before the mechanism section is final. Trains full-rank until each layer's *stable rank* stops
+  changing, then factorizes every layer at its stable rank and continues low-rank; reports comparable accuracy at
+  up to 5.6x fewer parameters (vision and some NLP). Our data are a direct test of that recipe for GLU gates in
+  LM pretraining: the gate's stable rank stabilises at about 27 by 40% of training, yet a factorization at rank
+  96 (3.5x the stable rank) at 25% or 50% ends 0.03 above dense and never recovers. Either the recipe does not
+  transfer to this setting, or stable rank is the wrong rank to read off; the paper must say which, carefully.
+- **arXiv 2205.13571, Schotthöfer et al. 2022, "Low-rank lottery tickets" (NeurIPS; DLRT).** Rank-adaptive
+  training on the low-rank manifold with a geometric integrator, adapting rank during training. The nearest
+  prior work to rank annealing; ours is a plain projection schedule on one matrix type. Read before calling the
+  anneal new; cite as the method family either way.
+- arXiv 2306.11250, "InRank: Incremental Low-Rank Learning" (2023): the opposite direction, start low-rank and
+  grow; relevant to the claim that the gate needs dimension to keep training.
+- arXiv 2308.14929, "Maestro: Uncovering Low-Rank Structures via Trainable Decomposition" (2023): trainable
+  ordered decompositions; another neighbour of the anneal.
+
 ## Low-rank pretraining (others)
 - [ ] arXiv 2508.02668: LOST (low-rank + sparse pretraining)
 - [ ] arXiv 2603.06492: NOBLE (nonlinear low-rank branches)

@@ -1405,3 +1405,11 @@ rank-128 one lands above 4.08), the gate control at 25% and 75%, and the probes 
 11 runs, about 15 GPU-hours, so about 7.5 h on two T4s after the fixed bench. Tests 21/21 (new: projection
 lowers the rank in place and the conversion at that rank is exact); baseline smoke curve unchanged; the anneal
 smoke steps 64 -> 26 -> 16 with no loss jump at the conversion.
+
+### 2026-10-02, evening: plan after session 11 (both branches), and two neighbours of the anneal found
+
+Cuttlefish (arXiv 2305.02538) factorizes each layer at its stable rank once that has settled, which is what our
+warm starts tested for the GLU gate; they lost 0.03 to dense. DLRT (arXiv 2205.13571) is rank-adaptive training
+on the low-rank manifold, the method family the anneal belongs to. Both must be read before the mechanism
+section is written. The branch plan (anneal wins: seeds and M, then write; anneal fails: the floor is
+representational, write) is in `HANDOFF.md`, "Plan after session 11". Exp. C is dropped unless time is left.
