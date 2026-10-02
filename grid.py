@@ -21,8 +21,9 @@ Stages follow the day-by-day plan:
     screen5 size S: warm starts at 50/75/90% (whitening fixed) plus the keep-dense control at 50% (truncate in place,
             stay dense: does the gate need its tail to train or to represent?), spectra of the thin gate and of
             shrunk, seeds 1-2 of the starved pair
-    screen6 size S: the keep-dense control for up and down (which projection's tail does training need most?) and at
-            25% / 75%; end-of-training truncation probes (Exp. A on our own models) for dense, shrunk and the self-gate
+    screen6 S and M: rank annealing of the gate (full rank to d/4 gradually, then a true factorization: is the rank-d/4
+            loss floor dynamical or representational?); the keep-dense control for up and down, at 25% / 75%, and at
+            size M; end-of-training truncation probes (Exp. A on our own models) for dense, shrunk and the self-gate
 
 Arms (r = rank, d = d_model, F = default d_ff):
     dense            standard SwiGLU
@@ -257,15 +258,19 @@ def runs_for(stage):
     elif stage == "screen6":
         s2 = screen2_arms("S")
         probe = {"final_probe": "0.5,0.25,0.125"}
-        plan = [("dense_probe", {**probe}, 0, {}),
-                ("warm_dense_up_f50", {"gate_rank": 96, "thin_at": 0.5, "thin_keep_dense": 1, "thin_proj": "up"}, 0, {}),
-                ("warm_dense_down_f50", {"gate_rank": 96, "thin_at": 0.5, "thin_keep_dense": 1, "thin_proj": "down"}, 0, {}),
-                ("warm_dense_r4_f25", {"gate_rank": 96, "thin_at": 0.25, "thin_keep_dense": 1}, 0, {}),
-                ("warm_dense_r4_f75", {"gate_rank": 96, "thin_at": 0.75, "thin_keep_dense": 1}, 0, {}),
-                ("shrunk_r4_probe", {"d_ff": 800, **probe}, 0, {}),
-                ("tied_gate_relu_probe", {**s2["tied_gate_relu"], **probe}, 0, {})]
-        for a, arm, seed, extra in plan:
-            out.append((f"S_{a}_s{seed}", "S", arm, seed, extra))
+        plan = [("S", "anneal_gate_r4_e85", {"gate_rank": 96, "rank_anneal": "0.2:0.85"}),           # the method
+                ("S", "warm_dense_up_f50", {"gate_rank": 96, "thin_at": 0.5, "thin_keep_dense": 1, "thin_proj": "up"}),
+                ("S", "warm_dense_down_f50", {"gate_rank": 96, "thin_at": 0.5, "thin_keep_dense": 1, "thin_proj": "down"}),
+                ("S", "dense_probe", {**probe}),
+                ("S", "anneal_gate_r4_e50", {"gate_rank": 96, "rank_anneal": "0.2:0.5"}),            # same end state as warm 50%
+                ("M", "warm_dense_r4_f50", {"gate_rank": 128, "thin_at": 0.5, "thin_keep_dense": 1}),   # the control at size M
+                ("M", "warm_gate_r4_f50", {"gate_rank": 128, "thin_at": 0.5}),
+                ("S", "warm_dense_r4_f25", {"gate_rank": 96, "thin_at": 0.25, "thin_keep_dense": 1}),
+                ("S", "warm_dense_r4_f75", {"gate_rank": 96, "thin_at": 0.75, "thin_keep_dense": 1}),
+                ("S", "shrunk_r4_probe", {"d_ff": 800, **probe}),
+                ("S", "tied_gate_relu_probe", {**s2["tied_gate_relu"], **probe})]
+        for size, a, arm in plan:
+            out.append((f"{size}_{a}_s0", size, arm, 0, {}))
     elif stage == "screen5":
         s2, s3, s4 = screen2_arms("S"), screen3_arms("S"), screen4_arms("S")
         plan = [("warm_gate_r4_f50", s4["warm_gate_r4_f50"], 0, {}),

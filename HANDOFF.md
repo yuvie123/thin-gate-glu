@@ -180,9 +180,10 @@ run log and the place where every decision is recorded.
 
 ### Next, in order
 1. ~~Sessions 2-8~~ done. Size S complete (main grid, three screens); size M key arms at two seeds. **GO.**
-2. **Session 11 (built 2026-10-02, upload next): `make_cloud_notebook.py --run bench,screen6`.** Bench (fixed)
-   first; then the keep-dense control for up and down at 50% and for the gate at 25% / 75%, and dense, shrunk
-   and the self-gate with the end-of-training truncation probe at r/d = 1/2, 1/4, 1/8. About 8 h.
+2. **Session 11 (rebuilt 2026-10-02 evening, upload next): `make_cloud_notebook.py --run bench,screen6`.** Bench
+   (fixed) first; then rank annealing of the gate (two schedules; predictions in `notes.md` 2026-10-02 later),
+   the keep-dense control for up and down at 50%, the dense probe, the keep-dense control at size M, the gate
+   control at 25% / 75%, and the shrunk and self-gate probes. 11 runs, about 7.5 h.
 3. **Reading remains the critical path:** Primer first, then Shazeer 2020, xIELU, MGLU, WeLore, and now Krotov
    and Hopfield 2016 (Dense Associative Memory) and the Energy Transformer if the tied-down block does anything.
 4. Optional GPU sessions, in value order: `--run bench` (S and M; needs the tied arms added to `bench.py`),

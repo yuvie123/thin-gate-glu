@@ -253,6 +253,25 @@ def test_tied_down_and_extra_activations():
     assert torch.allclose(bl(x), ((x @ bl.gate.weight.T) * (x @ bl.up.weight.T)) @ bl.down.weight.T, atol=1e-6), "bilinear"
 
 
+def test_rank_anneal_projection_then_exact_factorization():
+    """project_gates lowers the gate's rank in place; thin_gates at that rank is then exact (no shock)."""
+    from train import project_gates
+    torch.manual_seed(0)
+    L, H, d, F_ = 2, 2, 16, 24
+    model = GPT(GPTConfig(n_layer=L, n_head=H, d_model=d, d_ff=F_, seq_len=32))
+    x = torch.randint(0, 512, (2, 8))
+    project_gates(model, 6)
+    assert all(torch.linalg.matrix_rank(b.mlp.gate.weight) == 6 for b in model.blocks)
+    with torch.no_grad():
+        before = model(x).clone()
+    opt = torch.optim.AdamW(model.parameters(), lr=1e-3)
+    thin_gates(model, opt, 6, [None] * L, factor_wd=0.0)
+    with torch.no_grad():
+        after = model(x)
+    assert torch.allclose(before, after, atol=1e-4), "converting an already rank-6 gate to rank-6 factors must not change outputs"
+    assert all(isinstance(b.mlp.gate, LowRankLinear) for b in model.blocks)
+
+
 def test_weight_spectra_and_activity():
     from train import weight_spectra, truncate_in_place
     torch.manual_seed(0)

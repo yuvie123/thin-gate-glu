@@ -1377,3 +1377,31 @@ is the training-time counterpart of Exp. A. (2) *Exp. A on our own models:* `--f
 truncates each dense projection of the finished model by whitened SVD at three ranks, evaluates and restores
 (dense, shrunk, and the relu self-gate's up and down). This measures representational need directly and
 closes the loop between Exp. A and Exp. B inside one run. 7 runs, about 8 h, plus the two bench jobs.
+
+### 2026-10-02, later: session 11 pushed further: rank annealing (decision, assistant, on the author's request)
+
+The keep-dense control says a gate constrained to rank d/4 sits on a loss floor about 0.03 above dense whether
+the constraint comes at step 0 or at 50%, while a full-dimensional matrix recovers from the same cut. That
+leaves one question whose answer is either a method or the paper's sharpest sentence: **is the floor dynamical
+(a matter of how the gate gets to rank 96) or representational (no rank-96 gate reaches dense loss at this
+budget)?** Every low-rank result so far reached rank 96 by a shock (a factorization from step 0, or one cut).
+Rank annealing removes the shock: the dense gate trains normally until 20% of the steps, then every 50 steps
+it is projected (plain SVD) onto a rank that falls linearly from 384 to 96 by 85% of training, following the
+model's own concentration, and at 85% the already-rank-96 matrix becomes a true rank-96 factorization (exact,
+no loss jump, checked by a test) and trains at that rank to the end. Final parameter count = thin_gate_r4's.
+
+*Predictions, written before the run.* `anneal_gate_r4_e85`: below 4.105 (better than every rank-96 result
+so far, which range 4.117-4.145) with probability about 40%; within 0.01 of dense (below 4.097) about 15%.
+If it lands near 4.12, the floor is representational for rank d/4 at 300M tokens, and the mechanism paragraph
+says so. `anneal_gate_r4_e50` ends in the same state as the 50% warm start (rank 96 from step 2288) but gets
+there without the shock: below 4.1168 with probability about 60%; the difference between the two is the cost
+of the shock alone.
+
+Also in the session, in this order (the deadline drops the tail): the keep-dense control for up and for down at
+50% (which projection's dimensions does training need?), the dense end-of-training truncation probe, the
+e50 anneal, **the keep-dense control at size M** (`M_warm_dense_r4_f50` vs `M_warm_gate_r4_f50`, rank 128,
+200M tokens: the central claim at two sizes; prediction: the dense continuation recovers to about 4.074, the
+rank-128 one lands above 4.08), the gate control at 25% and 75%, and the probes for shrunk and the self-gate.
+11 runs, about 15 GPU-hours, so about 7.5 h on two T4s after the fixed bench. Tests 21/21 (new: projection
+lowers the rank in place and the conversion at that rank is exact); baseline smoke curve unchanged; the anneal
+smoke steps 64 -> 26 -> 16 with no loss jump at the conversion.

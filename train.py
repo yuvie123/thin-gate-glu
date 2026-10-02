@@ -73,6 +73,12 @@ def get_args():
     ap.add_argument("--final_probe", default="",
                     help="comma-separated rank fractions, e.g. 0.5,0.25: after training, truncate each dense projection "
                          "(whitened SVD) to that rank in turn, evaluate, and restore. Exp. A applied to this run's own model")
+    ap.add_argument("--rank_anneal", default="",
+                    help="rank annealing of a dense gate: 'start:end' as fractions of training, e.g. 0.2:0.85. From start "
+                         "to end the gate is projected (plain SVD) every --anneal_every steps onto a rank that falls "
+                         "linearly from full to --gate_rank; at end it becomes a true rank --gate_rank factorization "
+                         "(exact, no shock) and training continues at that rank")
+    ap.add_argument("--anneal_every", type=int, default=50)
     ap.add_argument("--thin_keep_dense", type=int, default=0,
                     help="with --thin_at: 1 truncates the gate in place at the swap but keeps it dense and trainable "
                          "(the control that separates 'the tail is needed to train' from 'needed to represent')")
@@ -130,6 +136,15 @@ def calibration_blocks(data, n_seqs, seed):
         s = rng.integers(0, len(shard) - T - 1)
         rows.append(np.asarray(shard[s:s + T]))
     return torch.from_numpy(np.stack(rows).astype(np.int64))
+
+
+@torch.no_grad()
+def project_gates(model, rank):
+    """Rank annealing step: replace every dense gate by its best rank-r approximation (plain SVD), in place."""
+    for b in model.blocks:
+        W = b.mlp.gate.weight
+        U, s, Vh = torch.linalg.svd(W.float(), full_matrices=False)
+        W.data.copy_(((U[:, :rank] * s[:rank]) @ Vh[:rank]).to(W.dtype))
 
 
 def truncate_in_place(model, rank, grams, proj="gate"):
@@ -343,10 +358,16 @@ def main():
         gate_tie=args.gate_tie, gate_act=args.gate_act, gate_shared=args.gate_shared,
         gate_bias=args.gate_bias, gate_bypass=args.gate_bypass, down_tie=args.down_tie, down_scale=args.down_scale,
     )
-    if args.thin_at > 0:
-        assert 0 < args.thin_at < 1 and args.gate_rank > 0, "--thin_at needs 0 < f < 1 and a --gate_rank target"
-        assert args.thin_proj == "gate" or args.thin_keep_dense, "a low-rank swap of up/down is not implemented; use --thin_keep_dense"
-        model = GPT(dataclasses.replace(cfg, gate_rank=0)).to(device)      # dense gate for the warm-up
+    anneal = None
+    if args.rank_anneal:
+        a0, a1 = (float(x) for x in args.rank_anneal.split(":"))
+        assert 0 < a0 < a1 < 1 and args.gate_rank > 0 and args.thin_at == 0, "--rank_anneal start:end with a --gate_rank target"
+        anneal = (a0, a1)
+    if args.thin_at > 0 or anneal:
+        if args.thin_at > 0:
+            assert 0 < args.thin_at < 1 and args.gate_rank > 0, "--thin_at needs 0 < f < 1 and a --gate_rank target"
+            assert args.thin_proj == "gate" or args.thin_keep_dense, "a low-rank swap of up/down is not implemented; use --thin_keep_dense"
+        model = GPT(dataclasses.replace(cfg, gate_rank=0)).to(device)      # dense gate for the warm-up / anneal
     else:
         model = GPT(cfg).to(device)
     params_initial = count_params(model)
@@ -385,6 +406,11 @@ def main():
     print(f"[{args.name}] {total_steps} steps x {args.batch_tokens} tokens, grad accumulation = {accum}, device = {device}")
 
     thin_step = int(args.thin_at * total_steps) if args.thin_at > 0 else None
+    anneal_steps = (int(anneal[0] * total_steps), int(anneal[1] * total_steps)) if anneal else None
+    anneal_events = []
+    if anneal_steps:
+        print(f"[{args.name}] rank anneal: full rank until step {anneal_steps[0]}, then linearly to rank {args.gate_rank} "
+              f"by step {anneal_steps[1]} (projection every {args.anneal_every} steps), then a true rank-{args.gate_rank} gate")
     if thin_step is not None:
         assert thin_step > args.warmup_steps, "thin the gate after the learning-rate warm-up"
         # Calibration windows for the whitening come from their own RNG, so the training stream is untouched.
@@ -409,6 +435,24 @@ def main():
     timed_tokens, t_timed = 0, None
 
     for step in range(total_steps):
+        if anneal_steps and anneal_steps[0] <= step < anneal_steps[1] and (step - anneal_steps[0]) % args.anneal_every == 0:
+            frac = (step - anneal_steps[0]) / (anneal_steps[1] - anneal_steps[0])
+            r_now = int(round(model.cfg.d_model - (model.cfg.d_model - args.gate_rank) * frac))
+            project_gates(model, r_now)
+            if not anneal_events or anneal_events[-1]["rank"] != r_now:
+                anneal_events.append({"step": step, "rank": r_now})
+        if anneal_steps and step == anneal_steps[1]:
+            project_gates(model, args.gate_rank)
+            val_before = evaluate(step_model, data, args, device, autocast)
+            thin_gates(model, opt, args.gate_rank, [None] * len(model.blocks), factor_wd)   # exact: W already has that rank
+            model.cfg = cfg
+            if step_model is not model:
+                torch._dynamo.reset()
+                step_model = torch.compile(model)
+            val_after = evaluate(step_model, data, args, device, autocast)
+            log["thin_swap"] = {"step": step, "val_before": val_before, "val_after": val_after,
+                                "params_after": count_params(model), "anneal": True}
+            print(f"[{args.name}] anneal done at step {step}: rank {args.gate_rank} factorization, VAL {val_before:.4f} -> {val_after:.4f}")
         if thin_step is not None and step == thin_step:
             val_before = evaluate(step_model, data, args, device, autocast)
             model.eval()
@@ -488,6 +532,8 @@ def main():
     max_preact = max_up_preactivation(model, data, args, device, autocast)
     for b in model.blocks:
         b.mlp.record_stats = False
+    if anneal_steps:
+        log["anneal"] = anneal_events
     if args.final_probe and not killed:
         fracs = [float(x) for x in args.final_probe.split(",") if x]
         probe_blocks = calibration_blocks(data, 8 * args.micro_bs, seed=args.seed + 20_000)

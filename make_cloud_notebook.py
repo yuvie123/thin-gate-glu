@@ -76,9 +76,12 @@ STEPS = {   # name -> (heading, command, note)
                 "alignment, input covariance rank), seeds 1-2 of tied_gate_relu_w600. References: S_thin_gate_r4_s0 = 4.1250, S_shrunk_w400 s1/s2 = 4.1535 / 4.1608."),
     "screen6": ("Experiment B: which tail does training need? plus Exp. A on our own models",
                 "python cloud_run.py grid --stage screen6 --max_hours 11",
-                "Keep-dense truncation at 50% of up and of down (the gate's gave 4.0895 vs 4.1168 low-rank), of the gate "
-                "at 25% and 75%; and dense, shrunk and the relu self-gate with a final whitened-truncation probe of each "
-                "projection at r/d = 1/2, 1/4, 1/8 (grid.py screen6). Bench reruns first with the compile-cache fix."),
+                "Rank annealing (dense gate projected gradually to rank d/4 between 20% and 85% of training, then a true "
+                "factorization; a second schedule ends at 50% for a direct comparison with the warm start, 4.1168); "
+                "keep-dense truncation at 50% of up and of down (the gate's gave 4.0895 vs 4.1168), of the gate at 25% "
+                "and 75%, and the gate control at size M; dense, shrunk and the relu self-gate with a final "
+                "whitened-truncation probe of each projection at r/d = 1/2, 1/4, 1/8 (grid.py screen6). Bench reruns "
+                "first with the compile-cache fix. References: dense S s0 4.0867, thin_gate_r4 S s0 4.1250, dense M s0 4.0735."),
     "lr": ("Experiment B: learning-rate check", "python cloud_run.py grid --stage lr --max_hours 11", ""),
     "heal": ("Experiment C: truncate, then train only the new factors", "python cloud_run.py heal", ""),
     "bench": ("Measured speed and memory of every arm", "python cloud_run.py bench", ""),
